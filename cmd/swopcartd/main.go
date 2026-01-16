@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/swopcart/server/config"
+	"github.com/swopcart/server/database"
 	"github.com/swopcart/server/www"
 )
 
@@ -29,6 +30,13 @@ func main() {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(ErrMainExit)
 
+	db, err := database.NewDatabase(&config, slog.Default())
+	if err != nil {
+		slog.Error("can't connect to database", "err", err)
+		os.Exit(1)
+	}
+	_ = db // TODO
+
 	server, err := www.NewServer(&config, slog.Default(), ctx)
 	if err != nil {
 		slog.Error("can't create web server", "err", err)
@@ -41,6 +49,8 @@ func main() {
 	}()
 
 	waitForExitSignal()
+	slog.Info("exiting")
+	server.Shutdown()
 }
 
 func loadConfig() (config.Config, error) {

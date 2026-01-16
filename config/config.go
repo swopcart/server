@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	Server Server `toml:"server"`
+	Server   Server   `toml:"server"`
+	Database Database `toml:"database"`
 }
 
 type Server struct {
@@ -15,11 +16,18 @@ type Server struct {
 	Address string `toml:"address"`
 }
 
+type Database struct {
+	Conn string `toml:"conn"` // PostgreSQL connection string (see https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
+}
+
 func DefaultConfig() Config {
 	return Config{
 		Server: Server{
 			Network: "tcp",
 			Address: "0.0.0.0:8000",
+		},
+		Database: Database{
+			Conn: "postgres://swopcart:swopcart@localhost:5432/swopcart",
 		},
 	}
 }
