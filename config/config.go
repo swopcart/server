@@ -37,12 +37,13 @@ func LoadConfig(path string) (cfg Config, err error) {
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	cfg = DefaultConfig()
 
-	decoder := toml.NewDecoder(file)
-	decoder.Decode(&cfg)
+	decoder := toml.NewDecoder(file).
+		DisallowUnknownFields()
+	err = decoder.Decode(&cfg)
 
 	return
 }

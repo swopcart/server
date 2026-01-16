@@ -50,7 +50,7 @@ func main() {
 
 	waitForExitSignal()
 	slog.Info("exiting")
-	server.Shutdown()
+	_ = server.Shutdown()
 }
 
 func loadConfig() (config.Config, error) {
