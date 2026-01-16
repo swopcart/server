@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/swopcart/server/config"
+	"github.com/swopcart/server/internal/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

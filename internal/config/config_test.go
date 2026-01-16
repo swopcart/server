@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/swopcart/server/config"
+	"github.com/swopcart/server/internal/config"
 )
 
 func TestLoadConfig(t *testing.T) {

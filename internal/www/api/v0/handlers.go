@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swopcart/server/config"
+	"github.com/swopcart/server/internal/config"
 )
 
 type APIHandlers struct {

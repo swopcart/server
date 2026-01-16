@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/swopcart/server/config"
-	"github.com/swopcart/server/database"
-	"github.com/swopcart/server/www"
+	"github.com/swopcart/server/internal/config"
+	"github.com/swopcart/server/internal/database"
+	"github.com/swopcart/server/internal/www"
 )
 
 var ErrMainExit = errors.New("main() exited")

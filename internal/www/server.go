@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swopcart/server/config"
-	v0 "github.com/swopcart/server/www/api/v0"
+	"github.com/swopcart/server/internal/config"
+	v0 "github.com/swopcart/server/internal/www/api/v0"
 )
 
 type Server struct {
