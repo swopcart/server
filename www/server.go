@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swopcart/server/config"
+	v0 "github.com/swopcart/server/www/api/v0"
 )
 
 type Server struct {
@@ -16,8 +17,10 @@ type Server struct {
 	logger *slog.Logger
 	ctx    context.Context
 
-	router     *gin.Engine
+	Router     *gin.Engine
 	httpServer *http.Server
+
+	v0 *v0.APIHandlers
 }
 
 func NewServer(
@@ -35,7 +38,7 @@ func NewServer(
 		config: config,
 		logger: logger.WithGroup("www"),
 
-		router:     router,
+		Router:     router,
 		httpServer: httpServer,
 	}
 
