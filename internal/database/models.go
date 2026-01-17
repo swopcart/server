@@ -3,14 +3,15 @@ package database
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type User struct {
 	gorm.Model
 
-	UUID     string `gorm:"uniqueIndex"`
-	Username string `gorm:"uniqueIndex"`
+	UUID     uuid.UUID `gorm:"uniqueIndex"`
+	Username string    `gorm:"uniqueIndex"`
 
 	Password string
 	TOTP     *string
@@ -23,7 +24,7 @@ type User struct {
 type Session struct {
 	gorm.Model
 
-	UUID      string `gorm:"uniqueIndex"`
+	UUID      uuid.UUID `gorm:"uniqueIndex"`
 	UserAgent string
 
 	UserID uint
