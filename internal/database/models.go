@@ -24,10 +24,14 @@ type User struct {
 type Session struct {
 	gorm.Model
 
-	UUID      uuid.UUID `gorm:"uniqueIndex"`
-	UserAgent string
+	UUID             uuid.UUID `gorm:"uniqueIndex"`
+	RefreshTokenHash string    `gorm:"index"`
 
 	UserID uint
 
+	IPAddress string
+	UserAgent string
+
 	LastUsedAt *time.Time
+	RevokedAt  *time.Time
 }

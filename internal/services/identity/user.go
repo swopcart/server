@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/pquerna/otp/totp"
 	"github.com/swopcart/server/internal/database"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -44,6 +45,8 @@ var ErrPasswordNotComplex = errors.New("password must contain a lowercase letter
 
 var ErrNotFound = errors.New("not found")
 var ErrInternal = errors.New("internal error")
+
+var ErrInvalidTOTP = errors.New("invalid TOTP token")
 
 func (svc *IdentityService) newUser(user database.User) *User {
 	return &User{
@@ -270,12 +273,29 @@ func checkPassword(hash, password string) error {
 	return nil
 }
 
-func (u *User) CheckTOTP(token string) (bool, error) {
-	panic("TODO")
+func (u *User) CheckTOTP(token string) error {
+	if u.data.TOTP == nil {
+		return nil
+	}
+
+	if !totp.Validate(token, *u.data.TOTP) {
+		return ErrInvalidTOTP
+	}
+
+	return nil
 }
 
-func (u *User) EnableTOTP(secret, token string) error {
-	panic("TODO")
+func (u *User) EnableTOTP(ctx context.Context, secret, token string) error {
+	if !totp.Validate(token, secret) {
+		return ErrInvalidTOTP
+	}
+
+	_, err := u.gormChain().Update(ctx, "totp", secret)
+	if err != nil {
+		return err
+	}
+
+	return u.Reload(ctx)
 }
 
 func (u *User) Admin() bool {

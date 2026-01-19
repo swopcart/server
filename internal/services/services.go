@@ -9,7 +9,7 @@ import (
 
 	"github.com/swopcart/server/internal/config"
 	"github.com/swopcart/server/internal/services/identity"
-	"github.com/swopcart/server/internal/services/oobe"
+	"github.com/swopcart/server/internal/services/session"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ type Services struct {
 	serviceList []string
 
 	Identity *identity.IdentityService
-	OOBE     *oobe.OutOfBoxService
+	Session  *session.SessionService
 }
 
 type ServiceInitError struct {
@@ -32,23 +32,22 @@ func NewServices(
 	logger *slog.Logger,
 	db *gorm.DB,
 ) (*Services, error) {
-	idsmSvc, err := identity.NewIdentitySessionManager(ctx, config,
-		logger.WithGroup("idsm"), db)
+	identitySvc, err := identity.NewIdentitySessionManager(ctx, config,
+		logger.WithGroup("identity"), db)
 	if err != nil {
-		return nil, newServiceInitError("oobe", err)
+		return nil, newServiceInitError("identity", err)
 	}
 
-	oobeSvc, err := oobe.NewOutOfBoxService(ctx, config,
-		logger.WithGroup("oobe"), db, idsmSvc)
+	sessionSvc, err := session.NewSessionService(config, logger.WithGroup("session"), db, identitySvc)
 	if err != nil {
-		return nil, newServiceInitError("oobe", err)
+		return nil, newServiceInitError("session", err)
 	}
 
 	return &Services{
 		context:  ctx,
 		config:   config,
-		Identity: idsmSvc,
-		OOBE:     oobeSvc,
+		Identity: identitySvc,
+		Session:  sessionSvc,
 	}, nil
 }
 
