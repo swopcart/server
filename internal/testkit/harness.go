@@ -38,6 +38,13 @@ func New(t *testing.T) *Harness {
 		connStr = "postgres://swopcart:swopcart@localhost:5432/swopcart_test"
 	}
 
+	// Create a data directory in the temp dir for test files
+	dataDir := t.TempDir() + "/data"
+	if err := os.Mkdir(dataDir, 0755); err != nil {
+		t.Fatalf("failed to create test data directory: %v", err)
+	}
+	t.Setenv("SWOPCART_DATA", dataDir)
+
 	cfg := &config.Config{
 		Server: config.Server{
 			Network: "tcp",
@@ -45,6 +52,12 @@ func New(t *testing.T) *Harness {
 		},
 		Database: config.Database{
 			Conn: connStr,
+		},
+		Auth: config.Auth{
+			KeyPath:         "auth.key",
+			AccessTokenTTL:  300, // 5 minutes
+			RefreshTokenTTL: 90,  // 90 days
+			JWTIssuer:       "swopcart-test",
 		},
 	}
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/swopcart/server/internal/config"
 	"github.com/swopcart/server/internal/database"
+	"github.com/swopcart/server/internal/services"
 	"github.com/swopcart/server/internal/www"
 )
 
@@ -35,9 +36,14 @@ func main() {
 		slog.Error("can't connect to database", "err", err)
 		os.Exit(1)
 	}
-	_ = db // TODO
 
-	server, err := www.NewServer(&config, slog.Default(), ctx)
+	svc, err := services.NewServices(ctx, &config, slog.Default(), db)
+	if err != nil {
+		slog.Error("Failed to initialise services", "err", err)
+		os.Exit(1)
+	}
+
+	server, err := www.NewServer(&config, slog.Default(), ctx, svc)
 	if err != nil {
 		slog.Error("can't create web server", "err", err)
 		os.Exit(1)
