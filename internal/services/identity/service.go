@@ -5,10 +5,9 @@ import (
 	"log/slog"
 
 	"github.com/swopcart/server/internal/config"
+	"github.com/swopcart/server/internal/database"
 	"gorm.io/gorm"
 )
-
-const ServiceName = "idsm"
 
 type IdentityService struct {
 	context context.Context
@@ -17,23 +16,52 @@ type IdentityService struct {
 	db      *gorm.DB
 }
 
+const (
+	DefaultAdminUsername = "admin"
+	DefaultAdminPassword = "Admin123"
+)
+
 func NewIdentitySessionManager(
 	ctx context.Context,
 	cfg *config.Config,
 	l *slog.Logger,
 	db *gorm.DB,
 ) (*IdentityService, error) {
-	return &IdentityService{
+	svc := &IdentityService{
 		context: ctx,
 		config:  cfg,
 		logger:  l,
 		db:      db,
-	}, nil
+	}
+
+	if err := svc.ensureAdminExists(ctx); err != nil {
+		return nil, err
+	}
+
+	return svc, nil
 }
 
-func (idsm *IdentityService) Foobar() {
-	_ = idsm.config
-	_ = idsm.context
-	_ = idsm.logger
-	_ = idsm.db
+func (svc *IdentityService) ensureAdminExists(ctx context.Context) error {
+	count, err := gorm.G[database.User](svc.db).Count(ctx, "id")
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return nil
+	}
+
+	svc.logger.Info("No users found, creating default admin account",
+		"username", DefaultAdminUsername)
+
+	_, err = svc.CreateUser(ctx, DefaultAdminUsername, DefaultAdminPassword, true)
+	if err != nil {
+		svc.logger.Error("Failed to create default admin account", "err", err)
+		return err
+	}
+
+	svc.logger.Warn("Default admin account created - please change the password immediately",
+		"username", DefaultAdminUsername)
+
+	return nil
 }

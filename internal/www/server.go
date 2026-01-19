@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swopcart/server/internal/config"
+	"github.com/swopcart/server/internal/services"
 	v0 "github.com/swopcart/server/internal/www/api/v0"
 )
 
@@ -24,7 +25,11 @@ type Server struct {
 }
 
 func NewServer(
-	config *config.Config, logger *slog.Logger, ctx context.Context) (srv *Server, err error) {
+	config *config.Config,
+	logger *slog.Logger,
+	ctx context.Context,
+	services *services.Services,
+) (srv *Server, err error) {
 	router := gin.Default()
 
 	httpServer := &http.Server{
@@ -40,6 +45,8 @@ func NewServer(
 
 		Router:     router,
 		httpServer: httpServer,
+
+		v0: v0.NewAPIHandlers(config, logger.WithGroup("api/v0"), ctx, services),
 	}
 
 	srv.routes()
