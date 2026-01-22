@@ -215,7 +215,7 @@ func (s *Session) NewAccessToken(ctx context.Context) (accessToken string, err e
 		return
 	}
 
-	accessToken, err = svc.generateAccessToken(s.uuid, user.UUID())
+	accessToken, err = svc.generateAccessToken(s.uuid, user.UUID(), user.Username(), user.Admin())
 	if err != nil {
 		l.Error("Failed to generate access token", "err", err)
 		return

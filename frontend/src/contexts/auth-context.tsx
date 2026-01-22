@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { jwtDecode } from "jwt-decode";
 import type { User, LoginRequest } from "@/lib/api";
 import {
   login as apiLogin,
   logout as apiLogout,
+  refreshToken as apiRefreshToken,
   getAccessToken,
   getRefreshToken,
   clearTokens,
@@ -53,9 +54,9 @@ function getUserFromToken(accessToken: string): User | null {
 
 function getInitialAuthState(): AuthState {
   const accessToken = getAccessToken();
-  const refreshToken = getRefreshToken();
+  const refreshTokenValue = getRefreshToken();
 
-  if (accessToken && refreshToken) {
+  if (accessToken) {
     const user = getUserFromToken(accessToken);
     if (user) {
       return {
@@ -66,7 +67,17 @@ function getInitialAuthState(): AuthState {
     }
   }
 
-  // No valid token
+  // Access token is missing or expired - if we have a refresh token,
+  // start in loading state so we can attempt refresh on mount
+  if (refreshTokenValue) {
+    return {
+      user: null,
+      isLoading: true,
+      isAuthenticated: false,
+    };
+  }
+
+  // No tokens at all
   clearTokens();
   return {
     user: null,
@@ -77,6 +88,37 @@ function getInitialAuthState(): AuthState {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(getInitialAuthState);
+
+  // Attempt to refresh token on mount if we started in loading state
+  useEffect(() => {
+    const needsRefresh =
+      getRefreshToken() && !getUserFromToken(getAccessToken() || "");
+    if (!needsRefresh) {
+      return;
+    }
+
+    apiRefreshToken().then((newAccessToken) => {
+      if (newAccessToken) {
+        const user = getUserFromToken(newAccessToken);
+        if (user) {
+          setState({
+            user,
+            isLoading: false,
+            isAuthenticated: true,
+          });
+          return;
+        }
+      }
+
+      // Refresh failed
+      clearTokens();
+      setState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+    });
+  }, []);
 
   const login = async (req: LoginRequest): Promise<void> => {
     const response = await apiLogin(req);
