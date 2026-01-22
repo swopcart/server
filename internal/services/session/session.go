@@ -182,7 +182,7 @@ func (svc *SessionService) GetSessionsForUser(
 		return
 	}
 
-	sessions, err := userSessions.Offset(offset).Limit(limit).Find(ctx)
+	sessions, err := userSessions.Order("created_at DESC").Offset(offset).Limit(limit).Find(ctx)
 	if err != nil {
 		return
 	}
@@ -252,6 +252,10 @@ func (s *Session) UserAgent() string {
 
 func (s *Session) IPAddress() string {
 	return s.data.IPAddress
+}
+
+func (s *Session) RevokedAt() *time.Time {
+	return s.data.RevokedAt
 }
 
 func (s *Session) UserID() uint {

@@ -58,6 +58,7 @@ export interface Session {
   userAgent: string;
   ipAddress: string;
   active: boolean;
+  revokedAt: string | null;
 }
 
 export interface PaginatedResponse<T> {

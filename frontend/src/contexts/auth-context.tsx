@@ -13,6 +13,7 @@ import {
 
 interface AuthState {
   user: User | null;
+  sessionId: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -32,7 +33,12 @@ interface AccessTokenPayload {
   admin: boolean;
 }
 
-function getUserFromToken(accessToken: string): User | null {
+interface TokenData {
+  user: User;
+  sessionId: string;
+}
+
+function getDataFromToken(accessToken: string): TokenData | null {
   try {
     const payload = jwtDecode<AccessTokenPayload>(accessToken);
 
@@ -42,10 +48,13 @@ function getUserFromToken(accessToken: string): User | null {
     }
 
     return {
-      id: 0, // Not available in token
-      uuid: payload.sub,
-      username: payload.username,
-      admin: payload.admin,
+      user: {
+        id: 0, // Not available in token
+        uuid: payload.sub,
+        username: payload.username,
+        admin: payload.admin,
+      },
+      sessionId: payload.sid,
     };
   } catch {
     return null;
@@ -57,10 +66,11 @@ function getInitialAuthState(): AuthState {
   const refreshTokenValue = getRefreshToken();
 
   if (accessToken) {
-    const user = getUserFromToken(accessToken);
-    if (user) {
+    const tokenData = getDataFromToken(accessToken);
+    if (tokenData) {
       return {
-        user,
+        user: tokenData.user,
+        sessionId: tokenData.sessionId,
         isLoading: false,
         isAuthenticated: true,
       };
@@ -72,6 +82,7 @@ function getInitialAuthState(): AuthState {
   if (refreshTokenValue) {
     return {
       user: null,
+      sessionId: null,
       isLoading: true,
       isAuthenticated: false,
     };
@@ -81,6 +92,7 @@ function getInitialAuthState(): AuthState {
   clearTokens();
   return {
     user: null,
+    sessionId: null,
     isLoading: false,
     isAuthenticated: false,
   };
@@ -92,17 +104,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Attempt to refresh token on mount if we started in loading state
   useEffect(() => {
     const needsRefresh =
-      getRefreshToken() && !getUserFromToken(getAccessToken() || "");
+      getRefreshToken() && !getDataFromToken(getAccessToken() || "");
     if (!needsRefresh) {
       return;
     }
 
     apiRefreshToken().then((newAccessToken) => {
       if (newAccessToken) {
-        const user = getUserFromToken(newAccessToken);
-        if (user) {
+        const tokenData = getDataFromToken(newAccessToken);
+        if (tokenData) {
           setState({
-            user,
+            user: tokenData.user,
+            sessionId: tokenData.sessionId,
             isLoading: false,
             isAuthenticated: true,
           });
@@ -114,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTokens();
       setState({
         user: null,
+        sessionId: null,
         isLoading: false,
         isAuthenticated: false,
       });
@@ -122,8 +136,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (req: LoginRequest): Promise<void> => {
     const response = await apiLogin(req);
+    const tokenData = getDataFromToken(getAccessToken() || "");
     setState({
       user: response.user,
+      sessionId: tokenData?.sessionId ?? null,
       isLoading: false,
       isAuthenticated: true,
     });
@@ -134,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearTokens();
     setState({
       user: null,
+      sessionId: null,
       isLoading: false,
       isAuthenticated: false,
     });
