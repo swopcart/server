@@ -7,3 +7,5 @@ services:
       POSTGRES_DB: swopcart
       POSTGRES_USER: swopcart
       POSTGRES_PASSWORD: swopcart
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro

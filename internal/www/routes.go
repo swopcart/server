@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/swopcart/server/frontend"
 )
 
@@ -15,6 +16,8 @@ func (srv *Server) routes() {
 }
 
 func (srv *Server) apiRoutes() {
+	srv.Router.Use(requestID())
+
 	api := srv.Router.Group("/api")
 
 	v0 := api.Group("/v0")
@@ -25,7 +28,7 @@ func (srv *Server) webRoutes() {
 	distFS, _ := fs.Sub(frontend.Content, "dist")
 	srv.Router.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api") {
-			c.Status(http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
 
@@ -38,4 +41,17 @@ func (srv *Server) webRoutes() {
 
 		c.FileFromFS("/", http.FS(distFS))
 	})
+}
+
+const requestIDKey = "request_id"
+
+func requestID() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := uuid.New().String()
+
+		c.Set(requestIDKey, requestID)
+		c.Header("X-Request-ID", requestID)
+
+		c.Next()
+	}
 }

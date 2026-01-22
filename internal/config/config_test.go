@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/swopcart/server/config"
+	"github.com/swopcart/server/internal/config"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -22,6 +22,12 @@ func TestLoadConfig(t *testing.T) {
 		Database: config.Database{
 			Conn: "postgres://dbhost/potato",
 		},
+		Auth: config.Auth{
+			KeyPath:         "jwt.key",
+			AccessTokenTTL:  3000,
+			RefreshTokenTTL: 365,
+			JWTIssuer:       "foobar",
+		},
 	}
 
 	err := os.WriteFile(configPath, []byte(`
@@ -31,6 +37,12 @@ address = "127.0.0.1:420"
 
 [database]
 conn = "postgres://dbhost/potato"
+
+[auth]
+key-path = "jwt.key"
+access-token-ttl = 3000
+refresh-token-ttl = 365
+jwt-issuer = "foobar"
 `), 0o777)
 	if err != nil {
 		t.Log(err)
