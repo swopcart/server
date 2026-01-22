@@ -1,7 +1,40 @@
+import { BrowserRouter, Routes, Route } from "react-router";
 import { AuthProvider, useAuth } from "./contexts/auth-context";
-import { BackendTest } from "./pages/backend-test";
+import { ThemeProvider } from "./components/theme-provider";
 import { LoginPage } from "./pages/login";
+import { HomePage } from "./pages/home";
+import { LibraryPage } from "./pages/library";
+import { MyGamesPage } from "./pages/my-games";
+import { SettingsPage } from "./pages/settings";
+import { AccountPage } from "./pages/account";
 import { Spinner } from "./components/ui/spinner";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "./components/ui/sidebar";
+import { AppSidebar } from "./components/app-sidebar";
+
+function AuthenticatedLayout() {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 items-center gap-2 border-b px-4 md:hidden">
+          <SidebarTrigger />
+          <span className="font-semibold">Swopcart</span>
+        </header>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/my-games" element={<MyGamesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/account" element={<AccountPage />} />
+        </Routes>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -18,14 +51,18 @@ function AppContent() {
     return <LoginPage />;
   }
 
-  return <BackendTest />;
+  return <AuthenticatedLayout />;
 }
 
 export function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <BrowserRouter>
+      <ThemeProvider defaultTheme="system">
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 
