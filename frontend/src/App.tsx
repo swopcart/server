@@ -14,6 +14,9 @@ import {
   SidebarTrigger,
 } from "./components/ui/sidebar";
 import { AppSidebar } from "./components/app-sidebar";
+import { ManageUsersPage } from "./pages/settings/manage-users";
+import { AccountLoginPage } from "./pages/account/login";
+import { AccountSessionsPage } from "./pages/account/sessions";
 
 function AuthenticatedLayout() {
   return (
@@ -29,7 +32,10 @@ function AuthenticatedLayout() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/my-games" element={<MyGamesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/users" element={<ManageUsersPage />} />
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/account/login" element={<AccountLoginPage />} />
+          <Route path="/account/sessions" element={<AccountSessionsPage />} />
         </Routes>
       </SidebarInset>
     </SidebarProvider>

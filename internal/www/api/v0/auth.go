@@ -243,6 +243,7 @@ func (h *APIHandlers) authListSessions(c *gin.Context) {
 			"userAgent": session.UserAgent(),
 			"ipAddress": session.IPAddress(),
 			"active":    session.Active(),
+			"revokedAt": session.RevokedAt(),
 		})
 	}
 
