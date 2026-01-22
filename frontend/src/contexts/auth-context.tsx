@@ -19,7 +19,7 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   login: (req: LoginRequest) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -129,17 +129,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const logout = async (): Promise<void> => {
-    try {
-      await apiLogout();
-    } catch {
-      // Even if API call fails, clear local state
-    }
+  const logout = (): void => {
+    // Clear local state immediately for instant UI feedback
     clearTokens();
     setState({
       user: null,
       isLoading: false,
       isAuthenticated: false,
+    });
+
+    // Invalidate session on server in the background
+    apiLogout().catch(() => {
+      // Server-side logout failed, but local state is already cleared
     });
   };
 
