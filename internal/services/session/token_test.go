@@ -47,8 +47,10 @@ func TestGenerateAccessToken(t *testing.T) {
 	svc := testServiceForToken(t)
 	sessionUUID := uuid.New()
 	userUUID := uuid.New()
+	username := "testuser"
+	admin := true
 
-	token, err := svc.generateAccessToken(sessionUUID, userUUID)
+	token, err := svc.generateAccessToken(sessionUUID, userUUID, username, admin)
 	if err != nil {
 		t.Fatalf("generateAccessToken failed: %v", err)
 	}
@@ -76,6 +78,18 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	if claims.UserUUID != userUUID {
 		t.Errorf("expected user UUID %v, got %v", userUUID, claims.UserUUID)
+	}
+
+	if claims.Username != username {
+		t.Errorf("expected username %q, got %q", username, claims.Username)
+	}
+
+	if claims.Admin != admin {
+		t.Errorf("expected admin %v, got %v", admin, claims.Admin)
+	}
+
+	if claims.Subject != userUUID.String() {
+		t.Errorf("expected subject %q, got %q", userUUID.String(), claims.Subject)
 	}
 
 	if claims.Issuer != svc.config.Auth.JWTIssuer {
@@ -231,7 +245,10 @@ func TestAccessTokenClaims(t *testing.T) {
 	claims := AccessTokenClaims{
 		SessionUUID: sessionUUID,
 		UserUUID:    userUUID,
+		Username:    "testuser",
+		Admin:       true,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userUUID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "test",
@@ -244,6 +261,14 @@ func TestAccessTokenClaims(t *testing.T) {
 
 	if claims.UserUUID != userUUID {
 		t.Errorf("expected UserUUID %v, got %v", userUUID, claims.UserUUID)
+	}
+
+	if claims.Username != "testuser" {
+		t.Errorf("expected Username %q, got %q", "testuser", claims.Username)
+	}
+
+	if claims.Admin != true {
+		t.Errorf("expected Admin %v, got %v", true, claims.Admin)
 	}
 }
 

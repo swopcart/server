@@ -16,8 +16,10 @@ type TokenPair struct {
 }
 
 type AccessTokenClaims struct {
-	SessionUUID uuid.UUID `json:"sessionId"`
+	SessionUUID uuid.UUID `json:"sid"`
 	UserUUID    uuid.UUID `json:"userId"`
+	Username    string    `json:"username"`
+	Admin       bool      `json:"admin"`
 	jwt.RegisteredClaims
 }
 
@@ -26,14 +28,17 @@ type RefreshTokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (svc *SessionService) generateAccessToken(sessionUUID, userUUID uuid.UUID) (string, error) {
+func (svc *SessionService) generateAccessToken(sessionUUID, userUUID uuid.UUID, username string, admin bool) (string, error) {
 	now := time.Now()
 	expiresAt := now.Add(time.Duration(svc.config.Auth.AccessTokenTTL) * time.Second)
 
 	claims := AccessTokenClaims{
 		SessionUUID: sessionUUID,
 		UserUUID:    userUUID,
+		Username:    username,
+		Admin:       admin,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userUUID.String(),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
 			Issuer:    svc.config.Auth.JWTIssuer,

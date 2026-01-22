@@ -127,12 +127,12 @@ async function fetchWithAuth(
   return response;
 }
 
-async function refreshAccessToken(refreshToken: string): Promise<boolean> {
+async function refreshAccessToken(token: string): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refreshToken: token }),
     });
 
     if (!response.ok) {
@@ -145,6 +145,20 @@ async function refreshAccessToken(refreshToken: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Exported refresh function for auth context initialization
+export async function refreshToken(): Promise<string | null> {
+  const token = getRefreshToken();
+  if (!token) {
+    return null;
+  }
+
+  const success = await refreshAccessToken(token);
+  if (success) {
+    return getAccessToken();
+  }
+  return null;
 }
 
 // Auth API functions
