@@ -1,12 +1,8 @@
 import { ListItem } from "@/components/list-item";
 import { useAuth } from "@/contexts/auth-context";
-import {
-  LucideChevronRight,
-  LucideKeyRound,
-  LucideLaptop,
-  LucideLogOut,
-} from "lucide-react";
+import { LucideChevronRight, LucideLaptop, LucideLogOut } from "lucide-react";
 import { useNavigate } from "react-router";
+import { ChangePassword } from "./account/login/password";
 
 export function AccountPage() {
   const navigate = useNavigate();
@@ -17,12 +13,8 @@ export function AccountPage() {
       <h1 className="text-2xl font-semibold">Account ({user?.username})</h1>
 
       <div className="flex flex-col gap-2">
-        <ListItem
-          title="Login settings"
-          leading={<LucideKeyRound />}
-          trailing={<LucideChevronRight />}
-          onClick={() => navigate("/account/login")}
-        />
+        <ChangePassword />
+
         <ListItem
           title="Active sessions"
           leading={<LucideLaptop />}
