@@ -10,10 +10,11 @@ import (
 )
 
 type IdentityService struct {
-	context context.Context
-	config  *config.Config
-	logger  *slog.Logger
-	db      *gorm.DB
+	context     context.Context
+	config      *config.Config
+	logger      *slog.Logger
+	db          *gorm.DB
+	pendingTOTP *pendingTOTPStore
 }
 
 const (
@@ -28,10 +29,11 @@ func NewIdentitySessionManager(
 	db *gorm.DB,
 ) (*IdentityService, error) {
 	svc := &IdentityService{
-		context: ctx,
-		config:  cfg,
-		logger:  l,
-		db:      db,
+		context:     ctx,
+		config:      cfg,
+		logger:      l,
+		db:          db,
+		pendingTOTP: newPendingTOTPStore(PendingTOTPTTL),
 	}
 
 	if err := svc.ensureAdminExists(ctx); err != nil {
