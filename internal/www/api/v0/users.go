@@ -9,6 +9,49 @@ import (
 	"github.com/swopcart/server/internal/services/identity"
 )
 
+func (h *APIHandlers) userList(c *gin.Context) {
+	ctx := c.Request.Context()
+	l := h.getLogger(c)
+
+	var req struct {
+		Offset int `form:"offset"`
+	}
+
+	if err := c.ShouldBindQuery(&req); err != nil {
+		l.Debug("Invalid request", "err", err)
+		req.Offset = 0
+	}
+
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	users, total, err := h.services.Identity.GetAllUsers(ctx, PageSize, req.Offset)
+	if err != nil {
+		l.Error("Failed to get users", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
+		return
+	}
+
+	response := Paginated[gin.H]{
+		Offset: uint(req.Offset),
+		Total:  total,
+		Items:  make([]gin.H, 0, len(users)),
+	}
+
+	for _, user := range users {
+		response.Items = append(response.Items, gin.H{
+			"uuid":        user.UUID(),
+			"username":    user.Username(),
+			"admin":       user.Admin(),
+			"totpEnabled": user.HasTOTP(),
+			"createdAt":   user.CreatedAt(),
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 func (h *APIHandlers) userChangePassword(c *gin.Context) {
 	ctx := c.Request.Context()
 	l := h.getLogger(c)

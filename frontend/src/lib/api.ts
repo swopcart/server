@@ -300,3 +300,90 @@ export async function disableTOTP(
     throw new ApiError(response.status, body);
   }
 }
+
+// User management API functions
+export interface UserListItem extends UserDetails {
+  createdAt: string;
+}
+
+export async function listUsers(): Promise<PaginatedResponse<UserListItem>> {
+  const response = await fetchWithAuth("/users/", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+
+  return response.json() as Promise<PaginatedResponse<UserListItem>>;
+}
+
+export async function adminChangePassword(
+  userUuid: string,
+  newPassword: string,
+): Promise<void> {
+  const response = await fetchWithAuth(`/users/${userUuid}/password`, {
+    method: "POST",
+    body: JSON.stringify({ newPassword }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}
+
+export async function adminRemoveTotp(userUuid: string): Promise<void> {
+  const response = await fetchWithAuth(`/users/${userUuid}/totp`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}
+
+export async function deleteUser(userUuid: string): Promise<void> {
+  const response = await fetchWithAuth(`/users/${userUuid}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}
+
+export async function listUserSessions(
+  userUuid: string,
+): Promise<PaginatedResponse<Session>> {
+  const response = await fetchWithAuth(`/users/${userUuid}/sessions/`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+
+  return response.json() as Promise<PaginatedResponse<Session>>;
+}
+
+export async function adminRevokeSession(
+  userUuid: string,
+  sessionUuid: string,
+): Promise<void> {
+  const response = await fetchWithAuth(
+    `/users/${userUuid}/sessions/${sessionUuid}`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}

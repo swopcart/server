@@ -1,9 +1,10 @@
+import { Container } from "@/components/container";
+import { Header } from "@/components/header";
 import { ListItem } from "@/components/list-item";
 import { useAuth } from "@/contexts/auth-context";
 import { LucideChevronRight, LucideLaptop, LucideLogOut } from "lucide-react";
 import { useNavigate } from "react-router";
 import { ChangePassword } from "./account/login/password";
-import { Header } from "@/components/header";
 import { TotpSettings } from "./account/login/totp";
 
 export function AccountPage() {
@@ -13,7 +14,7 @@ export function AccountPage() {
   return (
     <>
       <Header title="Account" backHref="/" />
-      <div className="p-6 flex flex-col gap-4">
+      <Container className="p-6 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <ChangePassword />
           <TotpSettings />
@@ -31,7 +32,7 @@ export function AccountPage() {
             onClick={() => logout()}
           />
         </div>
-      </div>
+      </Container>
     </>
   );
 }

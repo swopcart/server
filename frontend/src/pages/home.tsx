@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/auth-context";
+import { Container } from "@/components/container";
 import { Header } from "@/components/header";
 
 export function HomePage() {
@@ -7,11 +8,11 @@ export function HomePage() {
   return (
     <>
       <Header title={`Welcome, ${user?.username}`} />
-      <div className="p-6">
+      <Container className="p-6">
         <p className="text-muted-foreground">
           Your gaming dashboard and recent activity.
         </p>
-      </div>
+      </Container>
     </>
   );
 }

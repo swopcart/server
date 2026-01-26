@@ -53,6 +53,7 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 
 	users := r.Group("/users", h.authMiddleware())
 	{
+		users.GET("/", h.userList)
 		users.GET("/:user_uuid", h.userGetDetails)
 		users.POST("/:user_uuid/password", h.userChangePassword)
 		users.POST("/:user_uuid/totp/generate", h.userGenerateTOTP)

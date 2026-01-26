@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Container } from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
@@ -49,26 +50,26 @@ export function AccountSessionsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 flex flex-col gap-4">
+      <Container className="p-6 flex flex-col gap-4">
         <h1 className="text-2xl font-semibold">Sessions</h1>
         <p className="text-muted-foreground">
           <Spinner />
         </p>
-      </div>
+      </Container>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6 flex flex-col gap-4">
+      <Container className="p-6 flex flex-col gap-4">
         <h1 className="text-2xl font-semibold">Sessions</h1>
         <p className="text-destructive">{error}</p>
-      </div>
+      </Container>
     );
   }
 
   return (
-    <div className="p-6 flex flex-col gap-4">
+    <Container className="p-6 flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">Sessions</h1>
 
       <div className="flex gap-2">
@@ -122,6 +123,6 @@ export function AccountSessionsPage() {
           <p className="text-muted-foreground">No sessions found.</p>
         )}
       </div>
-    </div>
+    </Container>
   );
 }
