@@ -24,6 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ import {
 export function AppSidebar() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { setOpenMobile } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -62,7 +64,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.to}>
-                  <NavLink to={item.to}>
+                  <NavLink to={item.to} onClick={() => setOpenMobile(false)}>
                     <SidebarMenuButton
                       isActive={location.pathname === item.to}
                       tooltip={item.label}
@@ -99,11 +101,21 @@ export function AppSidebar() {
                 <ChevronsUpDownIcon className="ml-auto" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-48">
-                <DropdownMenuItem onClick={() => navigate("/account")}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    navigate("/account");
+                    setOpenMobile(false);
+                  }}
+                >
                   <UserIcon />
                   Account
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    navigate("/settings");
+                    setOpenMobile(false);
+                  }}
+                >
                   <SettingsIcon />
                   Settings
                 </DropdownMenuItem>

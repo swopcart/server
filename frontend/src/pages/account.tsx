@@ -3,14 +3,15 @@ import { useAuth } from "@/contexts/auth-context";
 import { LucideChevronRight, LucideLaptop, LucideLogOut } from "lucide-react";
 import { useNavigate } from "react-router";
 import { ChangePassword } from "./account/login/password";
+import { Header } from "@/components/header";
 
 export function AccountPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
 
-  return (
+  return <>
+    <Header title="Account" backHref="/" />
     <div className="p-6 flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Account ({user?.username})</h1>
 
       <div className="flex flex-col gap-2">
         <ChangePassword />
@@ -29,5 +30,5 @@ export function AccountPage() {
         />
       </div>
     </div>
-  );
+  </>;
 }
