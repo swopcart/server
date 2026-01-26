@@ -23,6 +23,7 @@ import {
   LucideLaptop,
 } from "lucide-react";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
+import { MockOverlay } from "@/components/mock-overlay";
 
 export function ManageUserPage() {
   const { userUuid } = useParams<{ userUuid: string }>();
@@ -134,18 +135,20 @@ function AdminTab({ user }: { user: UserDetails }) {
 
   return (
     <div className="flex flex-col gap-4 pt-4">
-      <ListItem
-        title="Administrator"
-        subtitle="Administrators have full access to all settings and can manage other users."
-        htmlFor="admin-toggle"
-        trailing={
-          <Switch
-            id="admin-toggle"
-            checked={isAdmin}
-            onCheckedChange={handleToggleAdmin}
-          />
-        }
-      />
+      <MockOverlay>
+        <ListItem
+          title="Administrator"
+          subtitle="Administrators have full access to all settings and can manage other users."
+          htmlFor="admin-toggle"
+          trailing={
+            <Switch
+              id="admin-toggle"
+              checked={isAdmin}
+              onCheckedChange={handleToggleAdmin}
+            />
+          }
+        />
+      </MockOverlay>
     </div>
   );
 }
@@ -178,27 +181,29 @@ function LibrariesTab() {
   };
 
   return (
-    <div className="flex flex-col gap-4 pt-4">
-      <p className="text-sm text-muted-foreground">
-        Control which libraries this user can access.
-      </p>
-      <div className="flex flex-col gap-2">
-        {libraries.map((library) => (
-          <ListItem
-            key={library.id}
-            title={library.name}
-            htmlFor={`library-${library.id}`}
-            trailing={
-              <Switch
-                id={`library-${library.id}`}
-                checked={libraryAccess[library.id]}
-                onCheckedChange={() => handleToggleLibrary(library.id)}
-              />
-            }
-          />
-        ))}
+    <MockOverlay>
+      <div className="flex flex-col gap-4 pt-4">
+        <p className="text-sm text-muted-foreground">
+          Control which libraries this user can access.
+        </p>
+        <div className="flex flex-col gap-2">
+          {libraries.map((library) => (
+            <ListItem
+              key={library.id}
+              title={library.name}
+              htmlFor={`library-${library.id}`}
+              trailing={
+                <Switch
+                  id={`library-${library.id}`}
+                  checked={libraryAccess[library.id]}
+                  onCheckedChange={() => handleToggleLibrary(library.id)}
+                />
+              }
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    </MockOverlay>
   );
 }
 
@@ -211,66 +216,71 @@ function ParentalTab() {
   });
 
   return (
-    <div className="flex flex-col gap-4 pt-4">
-      <ListItem
-        title="Enable Parental Controls"
-        subtitle="Restrict content based on age ratings and categories."
-        htmlFor="parental-enabled"
-        trailing={
-          <Switch
-            id="parental-enabled"
-            checked={settings.enabled}
-            onCheckedChange={(checked) =>
-              setSettings({ ...settings, enabled: checked })
-            }
-          />
-        }
-      />
+    <MockOverlay>
+      <div className="flex flex-col gap-4 pt-4">
+        <ListItem
+          title="Enable Parental Controls"
+          subtitle="Restrict content based on age ratings and categories."
+          htmlFor="parental-enabled"
+          trailing={
+            <Switch
+              id="parental-enabled"
+              checked={settings.enabled}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, enabled: checked })
+              }
+            />
+          }
+        />
 
-      {settings.enabled && (
-        <>
-          <ListItem
-            title="Maximum Content Rating"
-            subtitle={`Current: ${settings.maxRating}`}
-            trailing={
-              <Button variant="outline" size="sm">
-                Change
-              </Button>
-            }
-          />
+        {settings.enabled && (
+          <>
+            <ListItem
+              title="Maximum Content Rating"
+              subtitle={`Current: ${settings.maxRating}`}
+              trailing={
+                <Button variant="outline" size="sm">
+                  Change
+                </Button>
+              }
+            />
 
-          <ListItem
-            title="Restrict Adult Content"
-            subtitle="Hide content marked as adult or mature."
-            htmlFor="restrict-adult"
-            trailing={
-              <Switch
-                id="restrict-adult"
-                checked={settings.restrictAdultContent}
-                onCheckedChange={(checked) =>
-                  setSettings({ ...settings, restrictAdultContent: checked })
-                }
-              />
-            }
-          />
+            <ListItem
+              title="Restrict Adult Content"
+              subtitle="Hide content marked as adult or mature."
+              htmlFor="restrict-adult"
+              trailing={
+                <Switch
+                  id="restrict-adult"
+                  checked={settings.restrictAdultContent}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, restrictAdultContent: checked })
+                  }
+                />
+              }
+            />
 
-          <ListItem
-            title="Require PIN for Purchases"
-            subtitle="Require a PIN to make any purchases."
-            htmlFor="require-pin"
-            trailing={
-              <Switch
-                id="require-pin"
-                checked={settings.requirePinForPurchases}
-                onCheckedChange={(checked) =>
-                  setSettings({ ...settings, requirePinForPurchases: checked })
-                }
-              />
-            }
-          />
-        </>
-      )}
-    </div>
+            <ListItem
+              title="Require PIN for Purchases"
+              subtitle="Require a PIN to make any purchases."
+              htmlFor="require-pin"
+              trailing={
+                <Switch
+                  id="require-pin"
+                  checked={settings.requirePinForPurchases}
+                  onCheckedChange={(checked) =>
+                    setSettings({
+                      ...settings,
+                      requirePinForPurchases: checked,
+                    })
+                  }
+                />
+              }
+            />
+          </>
+        )}
+      </div>
+    </MockOverlay>
   );
 }
 
@@ -293,31 +303,35 @@ function AuthenticationTab({ user }: { user: UserDetails }) {
         }
       />
 
-      <ListItem
-        title="Two-Factor Authentication"
-        subtitle={
-          user.totpEnabled
-            ? "TOTP is currently enabled."
-            : "TOTP is not enabled."
-        }
-        trailing={
-          user.totpEnabled ? (
-            <Button variant="destructive" size="sm">
-              Remove TOTP
-            </Button>
-          ) : undefined
-        }
-      />
+      <MockOverlay>
+        <ListItem
+          title="Two-Factor Authentication"
+          subtitle={
+            user.totpEnabled
+              ? "TOTP is currently enabled."
+              : "TOTP is not enabled."
+          }
+          trailing={
+            user.totpEnabled ? (
+              <Button variant="destructive" size="sm">
+                Remove TOTP
+              </Button>
+            ) : undefined
+          }
+        />
+      </MockOverlay>
 
-      <ListItem
-        title="Passkeys"
-        subtitle="No passkeys registered."
-        trailing={
-          <Button variant="outline" size="sm" disabled>
-            Manage
-          </Button>
-        }
-      />
+      <MockOverlay>
+        <ListItem
+          title="Passkeys"
+          subtitle="No passkeys registered."
+          trailing={
+            <Button variant="outline" size="sm" disabled>
+              Manage
+            </Button>
+          }
+        />
+      </MockOverlay>
     </div>
   );
 }
@@ -377,11 +391,11 @@ function SessionsTab({ userUuid }: { userUuid: string }) {
 
   return (
     <div className="flex flex-col gap-4 pt-4">
-      <div className="flex gap-2">
+      <MockOverlay className="w-fit">
         <Button variant="destructive" size="sm">
           Revoke All Sessions
         </Button>
-      </div>
+      </MockOverlay>
 
       <div className="flex flex-col gap-3">
         {sessions.map((session) => (

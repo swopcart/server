@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
 import { listSessions, revokeSession, type Session } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
+import { MockOverlay } from "@/components/mock-overlay";
 
 export function AccountSessionsPage() {
   const { sessionId: currentSessionId } = useAuth();
@@ -72,11 +73,11 @@ export function AccountSessionsPage() {
     <Container className="p-6 flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">Sessions</h1>
 
-      <div className="flex gap-2">
+      <MockOverlay className="w-fit">
         <Button variant="destructive" onClick={handleRevokeAll}>
           Revoke all sessions
         </Button>
-      </div>
+      </MockOverlay>
 
       <div className="flex flex-col gap-3">
         {sessions.map((session) => (
