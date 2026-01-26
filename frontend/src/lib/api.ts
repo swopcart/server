@@ -209,3 +209,94 @@ export async function revokeSession(sessionUuid: string): Promise<void> {
     throw new ApiError(response.status, body);
   }
 }
+
+// User API functions
+export interface UserDetails {
+  uuid: string;
+  username: string;
+  admin: boolean;
+  totpEnabled: boolean;
+}
+
+export async function getUserDetails(userUuid: string): Promise<UserDetails> {
+  const response = await fetchWithAuth(`/users/${userUuid}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+
+  return response.json() as Promise<UserDetails>;
+}
+
+export async function changePassword(
+  userUuid: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const response = await fetchWithAuth(`/users/${userUuid}/password`, {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}
+
+// TOTP API functions
+export interface GenerateTOTPResponse {
+  secret: string;
+  url: string;
+}
+
+export async function generateTOTP(
+  userUuid: string,
+  password: string,
+): Promise<GenerateTOTPResponse> {
+  const response = await fetchWithAuth(`/users/${userUuid}/totp/generate`, {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+
+  return response.json() as Promise<GenerateTOTPResponse>;
+}
+
+export async function enableTOTP(
+  userUuid: string,
+  secret: string,
+  token: string,
+): Promise<void> {
+  const response = await fetchWithAuth(`/users/${userUuid}/totp`, {
+    method: "POST",
+    body: JSON.stringify({ secret, token }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}
+
+export async function disableTOTP(
+  userUuid: string,
+  password: string,
+): Promise<void> {
+  const response = await fetchWithAuth(`/users/${userUuid}/totp`, {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+}
