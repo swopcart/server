@@ -11,6 +11,7 @@ import { Spinner } from "./components/ui/spinner";
 import { SidebarProvider, SidebarInset } from "./components/ui/sidebar";
 import { AppSidebar } from "./components/app-sidebar";
 import { ManageUsersPage } from "./pages/settings/manage-users";
+import { ManageUserPage } from "./pages/settings/manage-user";
 import { AccountSessionsPage } from "./pages/account/sessions";
 
 function AuthenticatedLayout() {
@@ -24,6 +25,10 @@ function AuthenticatedLayout() {
           <Route path="/my-games" element={<MyGamesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/users" element={<ManageUsersPage />} />
+          <Route
+            path="/settings/users/:userUuid"
+            element={<ManageUserPage />}
+          />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/account/sessions" element={<AccountSessionsPage />} />
         </Routes>
