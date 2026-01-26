@@ -8,6 +8,7 @@ import {
   LucideUsers,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { Header } from "@/components/header";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -41,19 +42,22 @@ export function SettingsPage() {
   );
 
   return (
-    <div className="p-6 flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+    <>
+      <Header title="Settings" backHref="/" />
+      <div className="p-6 flex flex-col gap-4">
+        <h1 className="text-2xl font-semibold">Settings</h1>
 
-      <div className="flex flex-col gap-2">
-        <ListItem
-          title="Instance information"
-          leading={<LucideInfo />}
-          trailing={<LucideChevronRight />}
-          onClick={() => navigate("/settings/info")}
-        />
+        <div className="flex flex-col gap-2">
+          <ListItem
+            title="Instance information"
+            leading={<LucideInfo />}
+            trailing={<LucideChevronRight />}
+            onClick={() => navigate("/settings/info")}
+          />
+        </div>
+
+        {adminSection}
       </div>
-
-      {adminSection}
-    </div>
+    </>
   );
 }

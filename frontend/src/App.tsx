@@ -8,11 +8,7 @@ import { MyGamesPage } from "./pages/my-games";
 import { SettingsPage } from "./pages/settings";
 import { AccountPage } from "./pages/account";
 import { Spinner } from "./components/ui/spinner";
-import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "./components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "./components/ui/sidebar";
 import { AppSidebar } from "./components/app-sidebar";
 import { ManageUsersPage } from "./pages/settings/manage-users";
 import { AccountSessionsPage } from "./pages/account/sessions";
@@ -22,10 +18,6 @@ function AuthenticatedLayout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4 md:hidden">
-          <SidebarTrigger />
-          <span className="font-semibold">Swopcart</span>
-        </header>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/library" element={<LibraryPage />} />
