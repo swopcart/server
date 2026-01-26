@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
@@ -133,6 +134,27 @@ func (svc *IdentityService) GetUserByUsername(ctx context.Context, username stri
 	}
 
 	return svc.newUser(user), nil
+}
+
+func (svc *IdentityService) GetAllUsers(ctx context.Context, limit, offset int) ([]*User, uint, error) {
+	usersQuery := gorm.G[database.User](svc.db)
+
+	count, err := usersQuery.Count(ctx, "id")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	dbUsers, err := usersQuery.Order("created_at DESC").Offset(offset).Limit(limit).Find(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	users := make([]*User, 0, len(dbUsers))
+	for _, dbUser := range dbUsers {
+		users = append(users, svc.newUser(dbUser))
+	}
+
+	return users, uint(count), nil
 }
 
 func (u *User) ID() uint {
@@ -300,6 +322,10 @@ func (u *User) EnableTOTP(ctx context.Context, secret, token string) error {
 
 func (u *User) Admin() bool {
 	return u.data.Admin
+}
+
+func (u *User) CreatedAt() time.Time {
+	return u.data.CreatedAt
 }
 
 func (u *User) SetAdmin(ctx context.Context, admin bool) error {
