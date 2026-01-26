@@ -50,6 +50,15 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 			sessions.DELETE("/:session_uuid", h.authRevokeSession)
 		}
 	}
+
+	users := r.Group("/users", h.authMiddleware())
+	{
+		users.GET("/:user_uuid", h.userGetDetails)
+		users.POST("/:user_uuid/password", h.userChangePassword)
+		users.POST("/:user_uuid/totp/generate", h.userGenerateTOTP)
+		users.POST("/:user_uuid/totp", h.userEnableTOTP)
+		users.DELETE("/:user_uuid/totp", h.userDisableTOTP)
+	}
 }
 
 func (h *APIHandlers) getPing(c *gin.Context) {

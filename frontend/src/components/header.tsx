@@ -46,7 +46,9 @@ export function Header({ title, actions, backHref, className }: HeaderProps) {
         )}
         <h1 className="text-base font-semibold">{title}</h1>
       </div>
-      {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="ml-auto flex items-center gap-2">{actions}</div>
+      )}
     </header>
   );
 }
