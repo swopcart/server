@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { disableTOTP } from "@/lib/api/users";
+import { useAsyncFn } from "@/hooks/use-async";
 
 interface RemoveTotpDialogProps {
   userUuid: string;
@@ -25,28 +26,20 @@ export function RemoveTotpDialog({
   onSuccess,
 }: RemoveTotpDialogProps) {
   const [open, setOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [{ loading, error }, executeDisable, reset] = useAsyncFn(disableTOTP);
 
   const handleOpenChange = (open: boolean) => {
     setOpen(open);
     if (!open) {
-      setError(null);
+      reset();
     }
   };
 
   const handleRemove = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await disableTOTP(userUuid);
+    await executeDisable(userUuid);
+    if (!error) {
       setOpen(false);
       onSuccess?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove TOTP");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -60,7 +53,11 @@ export function RemoveTotpDialog({
           {username}? This will make their account less secure.
         </DialogDescription>
 
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        {error && (
+          <p className="text-destructive text-sm">
+            {error instanceof Error ? error.message : "Failed to remove TOTP"}
+          </p>
+        )}
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>
@@ -69,9 +66,9 @@ export function RemoveTotpDialog({
           <Button
             variant="destructive"
             onClick={handleRemove}
-            disabled={isLoading}
+            disabled={loading}
           >
-            {isLoading ? "Removing..." : "Remove TOTP"}
+            {loading ? "Removing..." : "Remove TOTP"}
           </Button>
         </DialogFooter>
       </DialogContent>

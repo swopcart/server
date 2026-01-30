@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { createUser } from "@/lib/api/users";
 import type { UserListItem } from "@/lib/api/users";
+import { useAsyncFn } from "@/hooks/use-async";
+import { useFieldErrors } from "@/hooks/use-field-errors";
 
 interface CreateUserDialogProps {
   children: ReactElement;
@@ -28,14 +30,15 @@ export function CreateUserDialog({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [admin, setAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [{ data, loading, error }, executeCreate, reset] =
+    useAsyncFn(createUser);
+  const fieldErrors = useFieldErrors(error);
 
   const resetState = () => {
     setUsername("");
     setPassword("");
     setAdmin(false);
-    setError(null);
+    reset();
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -48,17 +51,10 @@ export function CreateUserDialog({
   const handleCreate = async () => {
     if (!username || !password) return;
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const newUser = await createUser({ username, password, admin });
+    await executeCreate({ username, password, admin });
+    if (data) {
       setOpen(false);
-      onSuccess?.(newUser);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create user");
-    } finally {
-      setIsLoading(false);
+      onSuccess?.(data);
     }
   };
 
@@ -81,6 +77,9 @@ export function CreateUserDialog({
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter username"
             />
+            {fieldErrors.username && (
+              <p className="text-destructive text-sm">{fieldErrors.username}</p>
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="password">Password</Label>
@@ -91,6 +90,9 @@ export function CreateUserDialog({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
             />
+            {fieldErrors.password && (
+              <p className="text-destructive text-sm">{fieldErrors.password}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Switch checked={admin} onCheckedChange={setAdmin} id="admin" />
@@ -98,7 +100,11 @@ export function CreateUserDialog({
           </div>
         </div>
 
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        {error && !fieldErrors.username && !fieldErrors.password && (
+          <p className="text-destructive text-sm">
+            {error instanceof Error ? error.message : "Failed to create user"}
+          </p>
+        )}
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>
@@ -106,9 +112,9 @@ export function CreateUserDialog({
           </DialogClose>
           <Button
             onClick={handleCreate}
-            disabled={isLoading || !username || !password}
+            disabled={loading || !username || !password}
           >
-            {isLoading ? "Creating..." : "Create User"}
+            {loading ? "Creating..." : "Create User"}
           </Button>
         </DialogFooter>
       </DialogContent>

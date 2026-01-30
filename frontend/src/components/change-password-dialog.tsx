@@ -12,6 +12,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { changePassword } from "@/lib/api/users";
+import { useAsyncFn } from "@/hooks/use-async";
+import { useFieldErrors } from "@/hooks/use-field-errors";
 
 interface ChangePasswordDialogProps {
   userUuid: string;
@@ -33,14 +35,19 @@ export function ChangePasswordDialog({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [{ loading, error }, executeChange, reset] = useAsyncFn(
+    (userUuid: string, newPassword: string, currentPassword?: string) =>
+      changePassword(userUuid, newPassword, currentPassword),
+  );
+  const fieldErrors = useFieldErrors(error);
 
   const resetState = () => {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    setError(null);
+    setValidationError(null);
+    reset();
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -53,37 +60,29 @@ export function ChangePasswordDialog({
   const handleSubmit = async () => {
     // Validation
     if (!adminMode && !currentPassword) {
-      setError("Current password is required");
+      setValidationError("Current password is required");
       return;
     }
     if (!newPassword) {
-      setError("New password is required");
+      setValidationError("New password is required");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setValidationError("Passwords do not match");
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    setValidationError(null);
 
-    try {
-      if (adminMode) {
-        await changePassword(userUuid, newPassword);
-      } else {
-        await changePassword(userUuid, newPassword, currentPassword);
-      }
+    if (adminMode) {
+      await executeChange(userUuid, newPassword);
+    } else {
+      await executeChange(userUuid, newPassword, currentPassword);
+    }
+
+    if (!error) {
       setOpen(false);
       onSuccess?.();
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Failed to change password");
-      }
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -123,6 +122,11 @@ export function ChangePasswordDialog({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
+              {fieldErrors.newPassword && (
+                <p className="text-destructive text-sm">
+                  {fieldErrors.newPassword}
+                </p>
+              )}
             </Field>
             <Field>
               <FieldLabel htmlFor="confirm-password">
@@ -137,15 +141,26 @@ export function ChangePasswordDialog({
               />
             </Field>
           </FieldGroup>
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {validationError && (
+            <p className="text-destructive text-sm">{validationError}</p>
+          )}
+          {error &&
+            !fieldErrors.newPassword &&
+            !fieldErrors.currentPassword && (
+              <p className="text-destructive text-sm">
+                {error instanceof Error
+                  ? error.message
+                  : "Failed to change password"}
+              </p>
+            )}
         </FieldSet>
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>
             Cancel
           </DialogClose>
-          <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? "Changing..." : "Change password"}
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? "Changing..." : "Change password"}
           </Button>
         </DialogFooter>
       </DialogContent>

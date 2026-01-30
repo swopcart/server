@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router";
 import { Container } from "@/components/container";
 import { Header } from "@/components/header";
@@ -19,7 +19,6 @@ import { Switch } from "@/components/ui/switch";
 import { getUserDetails, listUserSessions, disableTOTP } from "@/lib/api/users";
 import type { UserDetails } from "@/lib/api/users";
 import { revokeSession } from "@/lib/api/auth";
-import type { Session } from "@/lib/api/types";
 import {
   LucideShield,
   LucideLibrary,
@@ -29,26 +28,15 @@ import {
 } from "lucide-react";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { MockOverlay } from "@/components/mock-overlay";
+import { useAsync } from "@/hooks/use-async";
 
 export function ManageUserPage() {
   const { userUuid } = useParams<{ userUuid: string }>();
-  const [user, setUser] = useState<UserDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!userUuid) return;
-
-    getUserDetails(userUuid)
-      .then((data) => {
-        setUser(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || "Failed to load user");
-        setLoading(false);
-      });
-  }, [userUuid]);
+  const {
+    data: user,
+    loading,
+    error,
+  } = useAsync(() => getUserDetails(userUuid!), [userUuid]);
 
   if (loading) {
     return (
@@ -66,7 +54,9 @@ export function ManageUserPage() {
       <>
         <Header title="User Settings" backHref="/settings/users" />
         <div className="p-6">
-          <p className="text-destructive">{error || "User not found"}</p>
+          <p className="text-destructive">
+            {error?.message || "User not found"}
+          </p>
         </div>
       </>
     );
@@ -118,14 +108,7 @@ export function ManageUserPage() {
           </TabsContent>
 
           <TabsContent value="auth">
-            <AuthenticationTab
-              user={user}
-              onTotpRemoved={() =>
-                setUser((prev) =>
-                  prev ? { ...prev, totpEnabled: false } : null,
-                )
-              }
-            />
+            <AuthenticationTab user={user} />
           </TabsContent>
 
           <TabsContent value="sessions">
@@ -296,13 +279,7 @@ function ParentalTab() {
   );
 }
 
-function AuthenticationTab({
-  user,
-  onTotpRemoved,
-}: {
-  user: UserDetails;
-  onTotpRemoved: () => void;
-}) {
+function AuthenticationTab({ user }: { user: UserDetails }) {
   const [totpDialogOpen, setTotpDialogOpen] = useState(false);
   const [totpLoading, setTotpLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -314,7 +291,8 @@ function AuthenticationTab({
     try {
       await disableTOTP(user.uuid);
       setTotpDialogOpen(false);
-      onTotpRemoved();
+      // Note: Without cache invalidation, user needs to refresh to see change
+      window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove TOTP");
     } finally {
@@ -401,35 +379,22 @@ function AuthenticationTab({
 }
 
 function SessionsTab({ userUuid }: { userUuid: string }) {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listUserSessions(userUuid)
-      .then((response) => {
-        setSessions(response.items);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || "Failed to load sessions");
-        setLoading(false);
-      });
-  }, [userUuid]);
+  const {
+    data: sessionsData,
+    loading,
+    error,
+  } = useAsync(() => listUserSessions(userUuid), [userUuid]);
+  const sessions = sessionsData?.items ?? [];
 
   const handleRevoke = (sessionUuid: string) => {
     revokeSession(sessionUuid)
       .then(() => {
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.uuid === sessionUuid
-              ? { ...s, active: false, revokedAt: new Date().toISOString() }
-              : s,
-          ),
-        );
+        // Reload to show updated sessions
+        window.location.reload();
       })
-      .catch((err) => {
-        setError(err.message || "Failed to revoke session");
+      .catch(() => {
+        // Error handling could be improved with state management
+        alert("Failed to revoke session");
       });
   };
 
@@ -448,7 +413,9 @@ function SessionsTab({ userUuid }: { userUuid: string }) {
   if (error) {
     return (
       <div className="pt-4">
-        <p className="text-destructive">{error}</p>
+        <p className="text-destructive">
+          {error.message || "Failed to load sessions"}
+        </p>
       </div>
     );
   }
