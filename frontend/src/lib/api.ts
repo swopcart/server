@@ -387,3 +387,25 @@ export async function adminRevokeSession(
     throw new ApiError(response.status, body);
   }
 }
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  admin: boolean;
+}
+
+export async function createUser(
+  req: CreateUserRequest,
+): Promise<UserListItem> {
+  const response = await fetchWithAuth("/users/", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+
+  return response.json() as Promise<UserListItem>;
+}

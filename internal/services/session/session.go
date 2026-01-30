@@ -97,12 +97,12 @@ func (svc *SessionService) GetSessionByUUID(ctx context.Context, sessionUUID uui
 }
 
 // GetSessionDataFromAccessToken parses and validates an access token, returning
-// the session UUID and user UUID embedded in the token claims. Returns
-// ErrInvalidToken if the token is malformed, expired, or has an invalid
+// the session UUID, user UUID, and admin status embedded in the token claims.
+// Returns ErrInvalidToken if the token is malformed, expired, or has an invalid
 // signature.
 func (svc *SessionService) GetSessionDataFromAccessToken(
 	accessToken string,
-) (sessionUUID, userUUID uuid.UUID, err error) {
+) (sessionUUID, userUUID uuid.UUID, admin bool, err error) {
 	l := svc.logger.WithGroup("GetSessionDataFromAccessToken")
 
 	token, err := jwt.ParseWithClaims(accessToken, &AccessTokenClaims{}, svc.jwtKeyFunc(l))
@@ -120,6 +120,7 @@ func (svc *SessionService) GetSessionDataFromAccessToken(
 
 	sessionUUID = claims.SessionUUID
 	userUUID = claims.UserUUID
+	admin = claims.Admin
 	return
 }
 
