@@ -337,6 +337,7 @@ export async function adminChangePassword(
 export async function adminRemoveTotp(userUuid: string): Promise<void> {
   const response = await fetchWithAuth(`/users/${userUuid}/totp`, {
     method: "DELETE",
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
