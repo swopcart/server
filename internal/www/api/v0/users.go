@@ -33,7 +33,7 @@ func (h *APIHandlers) userList(c *gin.Context) {
 		return
 	}
 
-	response := Paginated[gin.H]{
+	response := PaginatedResponse[gin.H]{
 		Offset: uint(req.Offset),
 		Total:  total,
 		Items:  make([]gin.H, 0, len(users)),
@@ -542,7 +542,7 @@ func (h *APIHandlers) userListSessions(c *gin.Context) {
 		return
 	}
 
-	response := Paginated[gin.H]{
+	response := PaginatedResponse[gin.H]{
 		Offset: uint(req.Offset),
 		Total:  total,
 		Items:  make([]gin.H, 0, len(sessions)),
