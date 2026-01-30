@@ -154,18 +154,18 @@ func TestGetSessionDataFromAccessToken(t *testing.T) {
 	}
 
 	t.Run("valid token", func(t *testing.T) {
-		sessionUUID, _, _, err := svc.GetSessionDataFromAccessToken(accessToken)
+		sessionData, err := svc.GetSessionDataFromAccessToken(accessToken)
 		if err != nil {
 			t.Fatalf("GetSessionDataFromAccessToken failed: %v", err)
 		}
 
-		if sessionUUID != sess.UUID() {
-			t.Errorf("expected session UUID %v, got %v", sess.UUID(), sessionUUID)
+		if sessionData.SessionUUID != sess.UUID() {
+			t.Errorf("expected session UUID %v, got %v", sess.UUID(), sessionData.SessionUUID)
 		}
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		_, _, _, err := svc.GetSessionDataFromAccessToken("invalid-token")
+		_, err := svc.GetSessionDataFromAccessToken("invalid-token")
 		if err == nil {
 			t.Fatal("expected error for invalid token")
 		}
@@ -391,13 +391,13 @@ func TestNewAccessToken(t *testing.T) {
 	}
 
 	// Verify the token can be parsed back
-	sessionUUID, _, _, err := svc.GetSessionDataFromAccessToken(accessToken)
+	sessionData, err := svc.GetSessionDataFromAccessToken(accessToken)
 	if err != nil {
 		t.Fatalf("GetSessionDataFromAccessToken failed: %v", err)
 	}
 
-	if sessionUUID != sess.UUID() {
-		t.Errorf("expected session UUID %v, got %v", sess.UUID(), sessionUUID)
+	if sessionData.SessionUUID != sess.UUID() {
+		t.Errorf("expected session UUID %v, got %v", sess.UUID(), sessionData.SessionUUID)
 	}
 }
 

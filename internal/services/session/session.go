@@ -96,32 +96,38 @@ func (svc *SessionService) GetSessionByUUID(ctx context.Context, sessionUUID uui
 	return svc.newSession(session), nil
 }
 
+// SessionData contains the session information extracted from a validated access token.
+type SessionData struct {
+	SessionUUID uuid.UUID
+	UserUUID    uuid.UUID
+	Admin       bool
+}
+
 // GetSessionDataFromAccessToken parses and validates an access token, returning
 // the session UUID, user UUID, and admin status embedded in the token claims.
 // Returns ErrInvalidToken if the token is malformed, expired, or has an invalid
 // signature.
 func (svc *SessionService) GetSessionDataFromAccessToken(
 	accessToken string,
-) (sessionUUID, userUUID uuid.UUID, admin bool, err error) {
+) (*SessionData, error) {
 	l := svc.logger.WithGroup("GetSessionDataFromAccessToken")
 
 	token, err := jwt.ParseWithClaims(accessToken, &AccessTokenClaims{}, svc.jwtKeyFunc(l))
 	if err != nil {
 		l.Error("Can't parse JWT token", "err", err)
-		err = errors.Join(ErrInvalidToken, err)
-		return
+		return nil, errors.Join(ErrInvalidToken, err)
 	}
 
 	claims, ok := token.Claims.(*AccessTokenClaims)
 	if !ok || !token.Valid {
-		err = ErrInvalidToken
-		return
+		return nil, ErrInvalidToken
 	}
 
-	sessionUUID = claims.SessionUUID
-	userUUID = claims.UserUUID
-	admin = claims.Admin
-	return
+	return &SessionData{
+		SessionUUID: claims.SessionUUID,
+		UserUUID:    claims.UserUUID,
+		Admin:       claims.Admin,
+	}, nil
 }
 
 // GetSessionFromRefreshToken validates a refresh token and returns the
