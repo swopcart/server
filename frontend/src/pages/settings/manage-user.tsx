@@ -422,7 +422,7 @@ function SessionsTab({ userUuid }: { userUuid: string }) {
   }, [userUuid]);
 
   const handleRevoke = (sessionUuid: string) => {
-    adminRevokeSession(userUuid, sessionUuid)
+    adminRevokeSession(sessionUuid)
       .then(() => {
         setSessions((prev) =>
           prev.map((s) =>

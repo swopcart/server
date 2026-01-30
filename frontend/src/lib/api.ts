@@ -360,7 +360,7 @@ export async function deleteUser(userUuid: string): Promise<void> {
 export async function listUserSessions(
   userUuid: string,
 ): Promise<PaginatedResponse<Session>> {
-  const response = await fetchWithAuth(`/users/${userUuid}/sessions/`, {
+  const response = await fetchWithAuth(`/users/${userUuid}/sessions`, {
     method: "GET",
   });
 
@@ -372,16 +372,10 @@ export async function listUserSessions(
   return response.json() as Promise<PaginatedResponse<Session>>;
 }
 
-export async function adminRevokeSession(
-  userUuid: string,
-  sessionUuid: string,
-): Promise<void> {
-  const response = await fetchWithAuth(
-    `/users/${userUuid}/sessions/${sessionUuid}`,
-    {
-      method: "DELETE",
-    },
-  );
+export async function adminRevokeSession(sessionUuid: string): Promise<void> {
+  const response = await fetchWithAuth(`/auth/sessions/${sessionUuid}`, {
+    method: "DELETE",
+  });
 
   if (!response.ok) {
     const body = await response.json();
