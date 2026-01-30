@@ -353,6 +353,25 @@ func (u *User) EnableTOTPAtTime(ctx context.Context, secret, token string, t *ti
 	return u.Reload(ctx)
 }
 
+// HasTOTP returns true if the user has TOTP enabled
+func (u *User) HasTOTP() bool {
+	return u.data.TOTP != nil
+}
+
+// DisableTOTP removes the TOTP secret from the user
+func (u *User) DisableTOTP(ctx context.Context) error {
+	if u.data.TOTP == nil {
+		return ErrTOTPNotEnabled
+	}
+
+	_, err := u.gormChain().Update(ctx, "totp", nil)
+	if err != nil {
+		return err
+	}
+
+	return u.Reload(ctx)
+}
+
 func (u *User) Admin() bool {
 	return u.data.Admin
 }
