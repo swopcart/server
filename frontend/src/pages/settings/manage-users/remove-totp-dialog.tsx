@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { adminRemoveTotp } from "@/lib/api";
+import { disableTOTP } from "@/lib/api/users";
 
 interface RemoveTotpDialogProps {
   userUuid: string;
@@ -40,7 +40,7 @@ export function RemoveTotpDialog({
     setError(null);
 
     try {
-      await adminRemoveTotp(userUuid);
+      await disableTOTP(userUuid);
       setOpen(false);
       onSuccess?.();
     } catch (err) {

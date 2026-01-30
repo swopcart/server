@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteUser } from "@/lib/api";
+import { deleteUser } from "@/lib/api/users";
 
 interface DeleteUserDialogProps {
   userUuid: string;
