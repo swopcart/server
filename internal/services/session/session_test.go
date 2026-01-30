@@ -162,6 +162,14 @@ func TestGetSessionDataFromAccessToken(t *testing.T) {
 		if sessionData.SessionUUID != sess.UUID() {
 			t.Errorf("expected session UUID %v, got %v", sess.UUID(), sessionData.SessionUUID)
 		}
+
+		if sessionData.UserUUID != user.UUID() {
+			t.Errorf("expected user UUID %v, got %v (zero: %v)", user.UUID(), sessionData.UserUUID, uuid.UUID{})
+		}
+
+		if sessionData.Admin != user.Admin() {
+			t.Errorf("expected admin %v, got %v", user.Admin(), sessionData.Admin)
+		}
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
