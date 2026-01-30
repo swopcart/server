@@ -440,3 +440,59 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	l.Info("TOTP disabled successfully")
 	c.Status(http.StatusOK)
 }
+
+func (h *APIHandlers) userCreate(c *gin.Context) {
+	ctx := c.Request.Context()
+	l := h.getLogger(c)
+
+	// Check admin from JWT token claims
+	isAdmin, _ := c.Get("user_admin")
+	if isAdmin != true {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can create users"})
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		Admin    bool   `json:"admin"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	l = l.With("new_username", req.Username, "admin", req.Admin)
+
+	// Create the user
+	newUser, err := h.services.Identity.CreateUser(ctx, req.Username, req.Password, req.Admin)
+	if err != nil {
+		if errors.Is(err, identity.ErrUserAlreadyExists) {
+			c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
+			return
+		}
+		if errors.Is(err, identity.ErrUsernameTooShort) ||
+			errors.Is(err, identity.ErrUsernameTooLong) ||
+			errors.Is(err, identity.ErrUsernameInvalidChars) ||
+			errors.Is(err, identity.ErrUsernameStartsWithDigit) ||
+			errors.Is(err, identity.ErrPasswordTooShort) ||
+			errors.Is(err, identity.ErrPasswordTooLong) ||
+			errors.Is(err, identity.ErrPasswordNotComplex) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		l.Error("Failed to create user", "err", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	l.Info("User created successfully", "new_user_uuid", newUser.UUID())
+	c.JSON(http.StatusCreated, gin.H{
+		"uuid":        newUser.UUID(),
+		"username":    newUser.Username(),
+		"admin":       newUser.Admin(),
+		"totpEnabled": newUser.HasTOTP(),
+		"createdAt":   newUser.CreatedAt(),
+	})
+}

@@ -261,7 +261,7 @@ func (h *APIHandlers) authMiddleware() gin.HandlerFunc {
 
 		accessToken := strings.TrimPrefix(authHeader, "Bearer ")
 
-		sid, uid, err := h.services.Session.GetSessionDataFromAccessToken(accessToken)
+		sid, uid, admin, err := h.services.Session.GetSessionDataFromAccessToken(accessToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
@@ -270,6 +270,7 @@ func (h *APIHandlers) authMiddleware() gin.HandlerFunc {
 
 		c.Set("session_uuid", sid.String())
 		c.Set("user_uuid", uid.String())
+		c.Set("user_admin", admin)
 		c.Next()
 	}
 }
