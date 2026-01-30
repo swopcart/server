@@ -60,6 +60,7 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 		users.POST("/:user_uuid/totp/generate", h.userGenerateTOTP)
 		users.POST("/:user_uuid/totp", h.userEnableTOTP)
 		users.DELETE("/:user_uuid/totp", h.userDisableTOTP)
+		users.GET("/:user_uuid/sessions", h.userListSessions)
 	}
 }
 
