@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/swopcart/server/internal/database"
 	"golang.org/x/crypto/bcrypt"
@@ -296,11 +297,27 @@ func checkPassword(hash, password string) error {
 }
 
 func (u *User) CheckTOTP(token string) error {
+	return u.CheckTOTPAtTime(token, nil)
+}
+
+func (u *User) CheckTOTPAtTime(token string, t *time.Time) error {
 	if u.data.TOTP == nil {
 		return nil
 	}
 
-	if !totp.Validate(token, *u.data.TOTP) {
+	valid := false
+	if t != nil {
+		valid, _ = totp.ValidateCustom(token, *u.data.TOTP, *t, totp.ValidateOpts{
+			Period:    30,
+			Skew:      1,
+			Digits:    otp.DigitsSix,
+			Algorithm: otp.AlgorithmSHA1,
+		})
+	} else {
+		valid = totp.Validate(token, *u.data.TOTP)
+	}
+
+	if !valid {
 		return ErrInvalidTOTP
 	}
 
@@ -308,7 +325,23 @@ func (u *User) CheckTOTP(token string) error {
 }
 
 func (u *User) EnableTOTP(ctx context.Context, secret, token string) error {
-	if !totp.Validate(token, secret) {
+	return u.EnableTOTPAtTime(ctx, secret, token, nil)
+}
+
+func (u *User) EnableTOTPAtTime(ctx context.Context, secret, token string, t *time.Time) error {
+	valid := false
+	if t != nil {
+		valid, _ = totp.ValidateCustom(token, secret, *t, totp.ValidateOpts{
+			Period:    30,
+			Skew:      1,
+			Digits:    otp.DigitsSix,
+			Algorithm: otp.AlgorithmSHA1,
+		})
+	} else {
+		valid = totp.Validate(token, secret)
+	}
+
+	if !valid {
 		return ErrInvalidTOTP
 	}
 

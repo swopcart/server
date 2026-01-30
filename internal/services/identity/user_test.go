@@ -270,3 +270,109 @@ func TestSetAdmin(t *testing.T) {
 	}
 	assert.False(t, user.Admin())
 }
+
+func TestGetAllUsers_DefaultAdmin(t *testing.T) {
+	h := testkit.New(t)
+	id := h.Services.Identity
+
+	// The identity service creates a default admin user on initialization
+	users, count, err := id.GetAllUsers(t.Context(), 10, 0)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, uint(1), count)
+	assert.Len(t, users, 1)
+	assert.Equal(t, identity.DefaultAdminUsername, users[0].Username())
+}
+
+func TestGetAllUsers(t *testing.T) {
+	h := testkit.New(t)
+	id := h.Services.Identity
+
+	// Create additional users (default admin already exists)
+	_, err := id.CreateUser(t.Context(), "user1", DummyPassword, false)
+	if !assert.NoError(t, err) {
+		return
+	}
+	_, err = id.CreateUser(t.Context(), "user2", DummyPassword, true)
+	if !assert.NoError(t, err) {
+		return
+	}
+	_, err = id.CreateUser(t.Context(), "user3", DummyPassword, false)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	users, count, err := id.GetAllUsers(t.Context(), 10, 0)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	// 1 default admin + 3 created = 4 total
+	assert.Equal(t, uint(4), count)
+	assert.Len(t, users, 4)
+}
+
+func TestGetAllUsers_Limit(t *testing.T) {
+	h := testkit.New(t)
+	id := h.Services.Identity
+
+	// Create 3 additional users (default admin already exists)
+	for i := 1; i <= 3; i++ {
+		_, err := id.CreateUser(t.Context(), "user"+string(rune('0'+i)), DummyPassword, false)
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	users, count, err := id.GetAllUsers(t.Context(), 2, 0)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, uint(4), count, "total count should be 4 (1 admin + 3 created)")
+	assert.Len(t, users, 2, "should only return 2 users due to limit")
+}
+
+func TestGetAllUsers_Offset(t *testing.T) {
+	h := testkit.New(t)
+	id := h.Services.Identity
+
+	// Create 3 additional users (default admin already exists)
+	for i := 1; i <= 3; i++ {
+		_, err := id.CreateUser(t.Context(), "user"+string(rune('0'+i)), DummyPassword, false)
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	users, count, err := id.GetAllUsers(t.Context(), 10, 2)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, uint(4), count, "total count should be 4 (1 admin + 3 created)")
+	assert.Len(t, users, 2, "should return 2 users after offset of 2")
+}
+
+func TestGetAllUsers_LimitAndOffset(t *testing.T) {
+	h := testkit.New(t)
+	id := h.Services.Identity
+
+	// Create 5 additional users (default admin already exists)
+	for i := 1; i <= 5; i++ {
+		_, err := id.CreateUser(t.Context(), "user"+string(rune('0'+i)), DummyPassword, false)
+		if !assert.NoError(t, err) {
+			return
+		}
+	}
+
+	users, count, err := id.GetAllUsers(t.Context(), 2, 1)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, uint(6), count, "total count should be 6 (1 admin + 5 created)")
+	assert.Len(t, users, 2, "should return 2 users with limit=2, offset=1")
+}
