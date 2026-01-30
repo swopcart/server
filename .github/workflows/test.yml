@@ -62,7 +62,7 @@ jobs:
           DB_PASSWORD: swopcart
 
       - name: Upload coverage to Codecov
-        if: github.ref == 'refs/heads/main'
+        # if: github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
