@@ -496,3 +496,70 @@ func (h *APIHandlers) userCreate(c *gin.Context) {
 		"createdAt":   newUser.CreatedAt(),
 	})
 }
+
+func (h *APIHandlers) userListSessions(c *gin.Context) {
+	ctx := c.Request.Context()
+	l := h.getLogger(c)
+
+	// Check admin from JWT token claims
+	isAdmin, _ := c.Get("user_admin")
+	if isAdmin != true {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can view other users' sessions"})
+		return
+	}
+
+	// Parse target user UUID from URL
+	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		return
+	}
+
+	var req struct {
+		Offset int `json:"offset"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		l.Debug("Invalid request", "err", err)
+		req.Offset = 0
+	}
+
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	// Get the target user
+	user, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
+	if err != nil {
+		l.Error("Failed to get user", "err", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	l.Debug("Get sessions for user", "user.uuid", user.UUID(), "offset", req.Offset)
+	sessions, total, err := h.services.Session.GetSessionsForUser(ctx, user, PageSize, req.Offset)
+	if err != nil {
+		l.Error("Failed to get user's sessions", "err", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	response := Paginated[gin.H]{
+		Offset: uint(req.Offset),
+		Total:  total,
+		Items:  make([]gin.H, 0, len(sessions)),
+	}
+
+	for _, session := range sessions {
+		response.Items = append(response.Items, gin.H{
+			"uuid":      session.UUID(),
+			"createdAt": session.CreatedAt(),
+			"userAgent": session.UserAgent(),
+			"ipAddress": session.IPAddress(),
+			"active":    session.Active(),
+			"revokedAt": session.RevokedAt(),
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
+}

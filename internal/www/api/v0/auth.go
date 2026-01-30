@@ -89,14 +89,10 @@ func (h *APIHandlers) authRevokeSession(c *gin.Context) {
 	ctx := c.Request.Context()
 	l := h.getLogger(c).With("session.uuid", c.Param("session_uuid"))
 
-	currentUser, err := h.services.Identity.GetUserByUUID(ctx, uuid.MustParse(c.GetString("user_uuid")))
-	if err != nil {
-		l.Error("Failed to get current user", "err", err)
-		c.Status(http.StatusInternalServerError)
-		return
-	}
+	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
+	isAdmin, _ := c.Get("user_admin")
 
-	l = l.With("current_user.uuid", currentUser.UUID())
+	l = l.With("current_user.uuid", currentUserUUID)
 
 	sessionUUID, err := uuid.Parse(c.Param("session_uuid"))
 	if err != nil {
@@ -118,8 +114,16 @@ func (h *APIHandlers) authRevokeSession(c *gin.Context) {
 		return
 	}
 
-	if s.UserID() != currentUser.ID() && !currentUser.Admin() {
-		l.Error("Refusing to delete another user's session", "session.user.id", s.UserID(), "current_user.id", currentUser.ID())
+	// Get the session's owner to check ownership
+	sessionOwner, err := s.User(ctx)
+	if err != nil {
+		l.Error("Failed to get session owner", "err", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if sessionOwner.UUID() != currentUserUUID && isAdmin != true {
+		l.Error("Refusing to delete another user's session", "session.user.uuid", sessionOwner.UUID())
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "You can't revoke another user's session",
 		})
