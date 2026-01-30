@@ -64,8 +64,8 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 	}
 
 	// Get current user from auth context
-	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
-	currentUser, err := h.services.Identity.GetUserByUUID(ctx, currentUserUUID)
+	sessionData := getSessionData(c)
+	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
@@ -94,7 +94,7 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 		return
 	}
 
-	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", currentUserUUID)
+	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", sessionData.UserUUID)
 
 	// Authorization: non-admins can only change their own password
 	isOwnPassword := currentUser.UUID() == targetUser.UUID()
@@ -155,8 +155,8 @@ func (h *APIHandlers) userGetDetails(c *gin.Context) {
 	}
 
 	// Get current user from auth context
-	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
-	currentUser, err := h.services.Identity.GetUserByUUID(ctx, currentUserUUID)
+	sessionData := getSessionData(c)
+	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
@@ -202,8 +202,8 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 	}
 
 	// Get current user from auth context
-	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
-	currentUser, err := h.services.Identity.GetUserByUUID(ctx, currentUserUUID)
+	sessionData := getSessionData(c)
+	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
@@ -231,7 +231,7 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 		return
 	}
 
-	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", currentUserUUID)
+	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", sessionData.UserUUID)
 
 	// Authorization: non-admins can only generate TOTP for themselves
 	isOwnTOTP := currentUser.UUID() == targetUser.UUID()
@@ -287,8 +287,8 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 	}
 
 	// Get current user from auth context
-	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
-	currentUser, err := h.services.Identity.GetUserByUUID(ctx, currentUserUUID)
+	sessionData := getSessionData(c)
+	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
@@ -317,7 +317,7 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 		return
 	}
 
-	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", currentUserUUID)
+	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", sessionData.UserUUID)
 
 	// Authorization: non-admins can only enable TOTP for themselves
 	isOwnTOTP := currentUser.UUID() == targetUser.UUID()
@@ -368,8 +368,8 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	}
 
 	// Get current user from auth context
-	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
-	currentUser, err := h.services.Identity.GetUserByUUID(ctx, currentUserUUID)
+	sessionData := getSessionData(c)
+	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
@@ -397,7 +397,7 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 		return
 	}
 
-	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", currentUserUUID)
+	l = l.With("target_user_uuid", targetUUID, "current_user_uuid", sessionData.UserUUID)
 
 	// Authorization: non-admins can only disable TOTP for themselves
 	isOwnTOTP := currentUser.UUID() == targetUser.UUID()
@@ -446,8 +446,7 @@ func (h *APIHandlers) userCreate(c *gin.Context) {
 	l := h.getLogger(c)
 
 	// Check admin from JWT token claims
-	isAdmin, _ := c.Get("user_admin")
-	if isAdmin != true {
+	if !getSessionData(c).Admin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can create users"})
 		return
 	}
@@ -502,8 +501,7 @@ func (h *APIHandlers) userListSessions(c *gin.Context) {
 	l := h.getLogger(c)
 
 	// Check admin from JWT token claims
-	isAdmin, _ := c.Get("user_admin")
-	if isAdmin != true {
+	if !getSessionData(c).Admin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can view other users' sessions"})
 		return
 	}

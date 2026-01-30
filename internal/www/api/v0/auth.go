@@ -89,10 +89,8 @@ func (h *APIHandlers) authRevokeSession(c *gin.Context) {
 	ctx := c.Request.Context()
 	l := h.getLogger(c).With("session.uuid", c.Param("session_uuid"))
 
-	currentUserUUID := uuid.MustParse(c.GetString("user_uuid"))
-	isAdmin, _ := c.Get("user_admin")
-
-	l = l.With("current_user.uuid", currentUserUUID)
+	sessionData := getSessionData(c)
+	l = l.With("current_user.uuid", sessionData.UserUUID)
 
 	sessionUUID, err := uuid.Parse(c.Param("session_uuid"))
 	if err != nil {
@@ -122,7 +120,7 @@ func (h *APIHandlers) authRevokeSession(c *gin.Context) {
 		return
 	}
 
-	if sessionOwner.UUID() != currentUserUUID && isAdmin != true {
+	if sessionOwner.UUID() != sessionData.UserUUID && !sessionData.Admin {
 		l.Error("Refusing to delete another user's session", "session.user.uuid", sessionOwner.UUID())
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "You can't revoke another user's session",
@@ -144,7 +142,8 @@ func (h *APIHandlers) authRevokeSelf(c *gin.Context) {
 	l := h.getLogger(c)
 	ctx := c.Request.Context()
 
-	s, err := h.services.Session.GetSessionByUUID(ctx, uuid.MustParse(c.GetString("session_uuid")))
+	sessionData := getSessionData(c)
+	s, err := h.services.Session.GetSessionByUUID(ctx, sessionData.SessionUUID)
 	if err != nil {
 		l.Error("Failed to get session", "err", err)
 		c.Status(http.StatusInternalServerError)
@@ -217,9 +216,8 @@ func (h *APIHandlers) authListSessions(c *gin.Context) {
 		req.Offset = 0
 	}
 
-	user, err := h.services.Identity.GetUserByUUID(
-		ctx,
-		uuid.MustParse(c.GetString("user_uuid")))
+	sessionData := getSessionData(c)
+	user, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get user", "err", err)
 		c.Status(http.StatusInternalServerError)
@@ -254,6 +252,8 @@ func (h *APIHandlers) authListSessions(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+const sessionDataKey = "session_data"
+
 func (h *APIHandlers) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -265,16 +265,19 @@ func (h *APIHandlers) authMiddleware() gin.HandlerFunc {
 
 		accessToken := strings.TrimPrefix(authHeader, "Bearer ")
 
-		sid, uid, admin, err := h.services.Session.GetSessionDataFromAccessToken(accessToken)
+		sessionData, err := h.services.Session.GetSessionDataFromAccessToken(accessToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
 		}
 
-		c.Set("session_uuid", sid.String())
-		c.Set("user_uuid", uid.String())
-		c.Set("user_admin", admin)
+		c.Set(sessionDataKey, sessionData)
 		c.Next()
 	}
+}
+
+func getSessionData(c *gin.Context) *session.SessionData {
+	data, _ := c.Get(sessionDataKey)
+	return data.(*session.SessionData)
 }
