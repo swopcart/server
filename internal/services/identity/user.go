@@ -144,7 +144,7 @@ func (svc *IdentityService) GetAllUsers(ctx context.Context, limit, offset int) 
 		return nil, 0, err
 	}
 
-	dbUsers, err := usersQuery.Order("created_at DESC").Offset(offset).Limit(limit).Find(ctx)
+	dbUsers, err := usersQuery.Offset(offset).Limit(limit).Find(ctx)
 	if err != nil {
 		return nil, 0, err
 	}

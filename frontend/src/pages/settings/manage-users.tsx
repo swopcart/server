@@ -17,6 +17,7 @@ import {
   listUsers,
   adminRemoveTotp,
   deleteUser,
+  createUser,
   type UserListItem,
 } from "@/lib/api";
 import {
@@ -24,7 +25,11 @@ import {
   LucideShieldOff,
   LucideTrash2,
   LucideSettings,
+  LucideUserPlus,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { ChangePasswordDialog } from "@/components/change-password-dialog";
 
 export function ManageUsersPage() {
@@ -46,6 +51,13 @@ export function ManageUsersPage() {
     null,
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Create user dialog state
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createUsername, setCreateUsername] = useState("");
+  const [createPassword, setCreatePassword] = useState("");
+  const [createAdmin, setCreateAdmin] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
 
   useEffect(() => {
     listUsers()
@@ -105,6 +117,29 @@ export function ManageUsersPage() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!createUsername || !createPassword) return;
+
+    setCreateLoading(true);
+
+    try {
+      const newUser = await createUser({
+        username: createUsername,
+        password: createPassword,
+        admin: createAdmin,
+      });
+      setUsers((prev) => [...prev, newUser]);
+      setCreateDialogOpen(false);
+      setCreateUsername("");
+      setCreatePassword("");
+      setCreateAdmin(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -133,7 +168,16 @@ export function ManageUsersPage() {
 
   return (
     <>
-      <Header title="Manage Users" backHref="/settings" />
+      <Header
+        title="Manage Users"
+        backHref="/settings"
+        actions={
+          <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+            <LucideUserPlus className="size-4 md:mr-1" />
+            <span className="hidden md:inline">Create User</span>
+          </Button>
+        }
+      />
       <Container className="p-6 flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           {users.map((user) => (
@@ -244,6 +288,69 @@ export function ManageUsersPage() {
               disabled={deleteLoading}
             >
               {deleteLoading ? "Deleting..." : "Delete User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) {
+            setCreateUsername("");
+            setCreatePassword("");
+            setCreateAdmin(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>Create User</DialogTitle>
+          <DialogDescription>
+            Create a new user account. The user will be able to log in with
+            these credentials.
+          </DialogDescription>
+
+          <div className="flex flex-col gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                value={createUsername}
+                onChange={(e) => setCreateUsername(e.target.value)}
+                placeholder="Enter username"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={createPassword}
+                onChange={(e) => setCreatePassword(e.target.value)}
+                placeholder="Enter password"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={createAdmin}
+                onCheckedChange={setCreateAdmin}
+                id="admin"
+              />
+              <Label htmlFor="admin">Administrator</Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Cancel
+            </DialogClose>
+            <Button
+              onClick={handleCreateUser}
+              disabled={createLoading || !createUsername || !createPassword}
+            >
+              {createLoading ? "Creating..." : "Create User"}
             </Button>
           </DialogFooter>
         </DialogContent>

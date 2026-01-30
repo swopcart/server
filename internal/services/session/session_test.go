@@ -154,7 +154,7 @@ func TestGetSessionDataFromAccessToken(t *testing.T) {
 	}
 
 	t.Run("valid token", func(t *testing.T) {
-		sessionUUID, _, err := svc.GetSessionDataFromAccessToken(accessToken)
+		sessionUUID, _, _, err := svc.GetSessionDataFromAccessToken(accessToken)
 		if err != nil {
 			t.Fatalf("GetSessionDataFromAccessToken failed: %v", err)
 		}
@@ -165,7 +165,7 @@ func TestGetSessionDataFromAccessToken(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-		_, _, err := svc.GetSessionDataFromAccessToken("invalid-token")
+		_, _, _, err := svc.GetSessionDataFromAccessToken("invalid-token")
 		if err == nil {
 			t.Fatal("expected error for invalid token")
 		}
@@ -391,7 +391,7 @@ func TestNewAccessToken(t *testing.T) {
 	}
 
 	// Verify the token can be parsed back
-	sessionUUID, _, err := svc.GetSessionDataFromAccessToken(accessToken)
+	sessionUUID, _, _, err := svc.GetSessionDataFromAccessToken(accessToken)
 	if err != nil {
 		t.Fatalf("GetSessionDataFromAccessToken failed: %v", err)
 	}
