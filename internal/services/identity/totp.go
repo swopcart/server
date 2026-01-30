@@ -1,7 +1,6 @@
 package identity
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"time"
@@ -119,25 +118,4 @@ func (svc *IdentityService) GetPendingTOTP(userUUID uuid.UUID) *PendingTOTP {
 // ClearPendingTOTP removes the pending TOTP secret for a user
 func (svc *IdentityService) ClearPendingTOTP(userUUID uuid.UUID) {
 	svc.pendingTOTP.Delete(userUUID)
-}
-
-// User TOTP methods
-
-// HasTOTP returns true if the user has TOTP enabled
-func (u *User) HasTOTP() bool {
-	return u.data.TOTP != nil
-}
-
-// DisableTOTP removes the TOTP secret from the user
-func (u *User) DisableTOTP(ctx context.Context) error {
-	if u.data.TOTP == nil {
-		return ErrTOTPNotEnabled
-	}
-
-	_, err := u.gormChain().Update(ctx, "totp", nil)
-	if err != nil {
-		return err
-	}
-
-	return u.Reload(ctx)
 }
