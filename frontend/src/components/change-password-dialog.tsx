@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { changePassword, adminChangePassword } from "@/lib/api";
+import { changePassword } from "@/lib/api/users";
 
 interface ChangePasswordDialogProps {
   userUuid: string;
@@ -70,9 +70,9 @@ export function ChangePasswordDialog({
 
     try {
       if (adminMode) {
-        await adminChangePassword(userUuid, newPassword);
+        await changePassword(userUuid, newPassword);
       } else {
-        await changePassword(userUuid, currentPassword, newPassword);
+        await changePassword(userUuid, newPassword, currentPassword);
       }
       setOpen(false);
       onSuccess?.();

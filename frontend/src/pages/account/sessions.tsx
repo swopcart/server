@@ -3,7 +3,8 @@ import { Container } from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
-import { listSessions, revokeSession, type Session } from "@/lib/api";
+import { listSessions, revokeSession } from "@/lib/api/auth";
+import type { Session } from "@/lib/api/types";
 import { Spinner } from "@/components/ui/spinner";
 import { MockOverlay } from "@/components/mock-overlay";
 

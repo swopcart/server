@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { createUser, type UserListItem } from "@/lib/api";
+import { createUser } from "@/lib/api/users";
+import type { UserListItem } from "@/lib/api/users";
 
 interface CreateUserDialogProps {
   children: ReactElement;

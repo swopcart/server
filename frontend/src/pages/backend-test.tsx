@@ -9,8 +9,8 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import type { Session } from "@/lib/api";
-import { listSessions, revokeSession } from "@/lib/api";
+import { listSessions, revokeSession } from "@/lib/api/auth";
+import type { Session } from "@/lib/api/types";
 
 export function BackendTest() {
   const { user, logout } = useAuth();

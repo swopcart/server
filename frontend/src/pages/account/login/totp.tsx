@@ -25,7 +25,7 @@ import {
   generateTOTP,
   enableTOTP,
   disableTOTP,
-} from "@/lib/api";
+} from "@/lib/api/users";
 
 export function TotpSettings() {
   const { user } = useAuth();

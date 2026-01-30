@@ -16,14 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import {
-  getUserDetails,
-  listUserSessions,
-  adminRevokeSession,
-  adminRemoveTotp,
-  type UserDetails,
-  type Session,
-} from "@/lib/api";
+import { getUserDetails, listUserSessions, disableTOTP } from "@/lib/api/users";
+import type { UserDetails } from "@/lib/api/users";
+import { revokeSession } from "@/lib/api/auth";
+import type { Session } from "@/lib/api/types";
 import {
   LucideShield,
   LucideLibrary,
@@ -316,7 +312,7 @@ function AuthenticationTab({
     setError(null);
 
     try {
-      await adminRemoveTotp(user.uuid);
+      await disableTOTP(user.uuid);
       setTotpDialogOpen(false);
       onTotpRemoved();
     } catch (err) {
@@ -422,7 +418,7 @@ function SessionsTab({ userUuid }: { userUuid: string }) {
   }, [userUuid]);
 
   const handleRevoke = (sessionUuid: string) => {
-    adminRevokeSession(sessionUuid)
+    revokeSession(sessionUuid)
       .then(() => {
         setSessions((prev) =>
           prev.map((s) =>

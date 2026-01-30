@@ -5,7 +5,8 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { listUsers, type UserListItem } from "@/lib/api";
+import { listUsers } from "@/lib/api/users";
+import type { UserListItem } from "@/lib/api/users";
 import {
   LucideKeyRound,
   LucideShieldOff,
