@@ -4,6 +4,14 @@ import { Container } from "@/components/container";
 import { Header } from "@/components/header";
 import { ListItem } from "@/components/list-item";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -12,6 +20,7 @@ import {
   getUserDetails,
   listUserSessions,
   adminRevokeSession,
+  adminRemoveTotp,
   type UserDetails,
   type Session,
 } from "@/lib/api";
@@ -113,7 +122,14 @@ export function ManageUserPage() {
           </TabsContent>
 
           <TabsContent value="auth">
-            <AuthenticationTab user={user} />
+            <AuthenticationTab
+              user={user}
+              onTotpRemoved={() =>
+                setUser((prev) =>
+                  prev ? { ...prev, totpEnabled: false } : null,
+                )
+              }
+            />
           </TabsContent>
 
           <TabsContent value="sessions">
@@ -284,7 +300,32 @@ function ParentalTab() {
   );
 }
 
-function AuthenticationTab({ user }: { user: UserDetails }) {
+function AuthenticationTab({
+  user,
+  onTotpRemoved,
+}: {
+  user: UserDetails;
+  onTotpRemoved: () => void;
+}) {
+  const [totpDialogOpen, setTotpDialogOpen] = useState(false);
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleRemoveTotp = async () => {
+    setTotpLoading(true);
+    setError(null);
+
+    try {
+      await adminRemoveTotp(user.uuid);
+      setTotpDialogOpen(false);
+      onTotpRemoved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove TOTP");
+    } finally {
+      setTotpLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 pt-4">
       <ListItem
@@ -303,23 +344,25 @@ function AuthenticationTab({ user }: { user: UserDetails }) {
         }
       />
 
-      <MockOverlay>
-        <ListItem
-          title="Two-Factor Authentication"
-          subtitle={
-            user.totpEnabled
-              ? "TOTP is currently enabled."
-              : "TOTP is not enabled."
-          }
-          trailing={
-            user.totpEnabled ? (
-              <Button variant="destructive" size="sm">
-                Remove TOTP
-              </Button>
-            ) : undefined
-          }
-        />
-      </MockOverlay>
+      <ListItem
+        title="Two-Factor Authentication"
+        subtitle={
+          user.totpEnabled
+            ? "TOTP is currently enabled."
+            : "TOTP is not enabled."
+        }
+        trailing={
+          user.totpEnabled ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setTotpDialogOpen(true)}
+            >
+              Remove TOTP
+            </Button>
+          ) : undefined
+        }
+      />
 
       <MockOverlay>
         <ListItem
@@ -332,6 +375,31 @@ function AuthenticationTab({ user }: { user: UserDetails }) {
           }
         />
       </MockOverlay>
+
+      <Dialog open={totpDialogOpen} onOpenChange={setTotpDialogOpen}>
+        <DialogContent>
+          <DialogTitle>Remove Two-Factor Authentication</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to remove two-factor authentication for{" "}
+            {user.username}? This will make their account less secure.
+          </DialogDescription>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>
+              Cancel
+            </DialogClose>
+            <Button
+              variant="destructive"
+              onClick={handleRemoveTotp}
+              disabled={totpLoading}
+            >
+              {totpLoading ? "Removing..." : "Remove TOTP"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
