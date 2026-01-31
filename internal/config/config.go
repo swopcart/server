@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -11,6 +13,7 @@ type Config struct {
 	Server   Server   `toml:"server"`
 	Database Database `toml:"database"`
 	Auth     Auth     `toml:"auth"`
+	Jobs     Jobs     `toml:"jobs"`
 }
 
 type Server struct {
@@ -29,6 +32,16 @@ type Auth struct {
 	JWTIssuer       string `toml:"jwt-issuer"        comment:"issuer to use in JWT tokens"`
 }
 
+type Jobs struct {
+	DefaultWorkers  int                    `toml:"default-workers"  comment:"number of workers per queue (defaults to CPU core count)"`
+	ShutdownTimeout time.Duration          `toml:"shutdown-timeout" comment:"time to wait for running jobs during shutdown"`
+	Queues          map[string]QueueConfig `toml:"queues" comment:"per-queue worker configuration"`
+}
+
+type QueueConfig struct {
+	Workers int `toml:"workers" comment:"number of workers for this queue"`
+}
+
 func DefaultConfig() Config {
 	return Config{
 		Server: Server{
@@ -43,6 +56,11 @@ func DefaultConfig() Config {
 			AccessTokenTTL:  300,
 			RefreshTokenTTL: 90,
 			JWTIssuer:       "swopcart",
+		},
+		Jobs: Jobs{
+			DefaultWorkers:  runtime.NumCPU(),
+			ShutdownTimeout: 30 * time.Second,
+			Queues:          make(map[string]QueueConfig),
 		},
 	}
 }

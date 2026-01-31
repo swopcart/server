@@ -62,6 +62,16 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 		users.DELETE("/:user_uuid/totp", h.userDisableTOTP)
 		users.GET("/:user_uuid/sessions", h.userListSessions)
 	}
+
+	jobs := r.Group("/jobs", h.authMiddleware())
+	{
+		jobs.GET("/", h.jobsList)
+		jobs.GET("/executions/recent", h.jobsListRecentExecutions)
+		jobs.GET("/executions/:execution_uuid", h.jobsGetExecution)
+		jobs.GET("/:job_name", h.jobsGetDetails)
+		jobs.GET("/:job_name/history", h.jobsGetHistory)
+		jobs.POST("/:job_name/trigger", h.jobsTrigger)
+	}
 }
 
 func (h *APIHandlers) getPing(c *gin.Context) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/swopcart/server/internal/config"
 	"github.com/swopcart/server/internal/services/identity"
+	"github.com/swopcart/server/internal/services/jobs"
 	"github.com/swopcart/server/internal/services/session"
 	"gorm.io/gorm"
 )
@@ -20,6 +21,7 @@ type Services struct {
 
 	Identity *identity.IdentityService
 	Session  *session.SessionService
+	Jobs     *jobs.JobService
 }
 
 type ServiceInitError struct {
@@ -43,11 +45,17 @@ func NewServices(
 		return nil, newServiceInitError("session", err)
 	}
 
+	jobsSvc, err := jobs.NewJobService(ctx, config, logger.WithGroup("jobs"), db)
+	if err != nil {
+		return nil, newServiceInitError("jobs", err)
+	}
+
 	return &Services{
 		context:  ctx,
 		config:   config,
 		Identity: identitySvc,
 		Session:  sessionSvc,
+		Jobs:     jobsSvc,
 	}, nil
 }
 
