@@ -85,13 +85,6 @@ func respondFieldError(c *gin.Context, status int, code, message, key string) {
 	})
 }
 
-// respondMultipleErrors sends multiple errors at once
-func respondMultipleErrors(c *gin.Context, status int, errs []Error) {
-	c.JSON(status, ErrorResponse{
-		Errors: errs,
-	})
-}
-
 type errorMapping struct {
 	code    string
 	message string
