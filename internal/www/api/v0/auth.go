@@ -21,7 +21,7 @@ func (h *APIHandlers) authLogin(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindingError(c, err)
 		return
 	}
 
@@ -32,7 +32,7 @@ func (h *APIHandlers) authLogin(c *gin.Context) {
 	user, err := h.services.Identity.GetUserByUsername(ctx, req.Username)
 	if err != nil {
 		l.Error("Failed to find user with username", "err", err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Username and password are incorrect"})
+		respondError(c, http.StatusUnauthorized, ErrCodeInvalidCredentials, "Username and password are incorrect")
 		return
 	}
 
@@ -41,17 +41,14 @@ func (h *APIHandlers) authLogin(c *gin.Context) {
 	err = user.CheckPassword(req.Password)
 	if err != nil {
 		l.Error("Failed to check user password", "err", err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Username and password are incorrect"})
+		respondError(c, http.StatusUnauthorized, ErrCodeInvalidCredentials, "Username and password are incorrect")
 		return
 	}
 
 	err = user.CheckTOTP(req.TOTP)
 	if err != nil {
 		l.Error("Failed to check user's TOTP token", "err", err)
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":        "TOTP token is not valid",
-			"requiresTotp": true,
-		})
+		respondFieldError(c, http.StatusUnauthorized, ErrCodeRequiresTOTP, "TOTP token is required", ".totp")
 		return
 	}
 
@@ -94,17 +91,13 @@ func (h *APIHandlers) authRevokeSession(c *gin.Context) {
 
 	sessionUUID, err := uuid.Parse(c.Param("session_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid session UUID")
 		return
 	}
 
 	s, err := h.services.Session.GetSessionByUUID(ctx, sessionUUID)
 	if errors.Is(err, session.ErrNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Session not found",
-		})
+		respondWithSessionError(c, l, err, http.StatusNotFound)
 		return
 	} else if err != nil {
 		l.Error("Failed to get session", "err", err)
@@ -122,9 +115,7 @@ func (h *APIHandlers) authRevokeSession(c *gin.Context) {
 
 	if sessionOwner.UUID() != sessionData.UserUUID && !sessionData.Admin {
 		l.Error("Refusing to delete another user's session", "session.user.uuid", sessionOwner.UUID())
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "You can't revoke another user's session",
-		})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyOwnResource, "You can't revoke another user's session")
 		return
 	}
 
@@ -177,9 +168,7 @@ func (h *APIHandlers) authRefresh(c *gin.Context) {
 		req.RefreshToken)
 	if err != nil {
 		l.Error("Failed to get session from refresh token", "err", err)
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Invalid token",
-		})
+		respondWithSessionError(c, l, err, http.StatusUnauthorized)
 
 		return
 	}
@@ -187,9 +176,7 @@ func (h *APIHandlers) authRefresh(c *gin.Context) {
 	accessToken, err := s.NewAccessToken(c.Request.Context())
 	if err != nil {
 		l.Error("Failed to generate new access token", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to generate token",
-		})
+		c.Status(http.StatusInternalServerError)
 
 		return
 	}
@@ -232,7 +219,7 @@ func (h *APIHandlers) authListSessions(c *gin.Context) {
 		return
 	}
 
-	response := Paginated[gin.H]{
+	response := PaginatedResponse[gin.H]{
 		Offset: uint(req.Offset),
 		Total:  total,
 		Items:  make([]gin.H, 0, len(sessions)),
@@ -256,9 +243,11 @@ const sessionDataKey = "session_data"
 
 func (h *APIHandlers) authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		l := h.getLogger(c)
+
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authentication header"})
+			respondError(c, http.StatusUnauthorized, ErrCodeMissingAuth, "Missing authentication header")
 			c.Abort()
 			return
 		}
@@ -267,7 +256,7 @@ func (h *APIHandlers) authMiddleware() gin.HandlerFunc {
 
 		sessionData, err := h.services.Session.GetSessionDataFromAccessToken(accessToken)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			respondWithSessionError(c, l, err, http.StatusUnauthorized)
 			c.Abort()
 			return
 		}

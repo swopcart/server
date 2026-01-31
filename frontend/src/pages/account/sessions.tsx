@@ -1,43 +1,28 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Container } from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/auth-context";
-import { listSessions, revokeSession, type Session } from "@/lib/api";
+import { listSessions, revokeSession } from "@/lib/api/auth";
 import { Spinner } from "@/components/ui/spinner";
 import { MockOverlay } from "@/components/mock-overlay";
+import { useAsync } from "@/hooks/use-async";
 
 export function AccountSessionsPage() {
   const { sessionId: currentSessionId } = useAuth();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listSessions()
-      .then((response) => {
-        setSessions(response.items);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || "Failed to load sessions");
-        setLoading(false);
-      });
-  }, []);
+  const { data: sessionsData, loading, error } = useAsync(listSessions);
+  const sessions = sessionsData?.items ?? [];
+  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   const handleRevoke = (sessionUuid: string) => {
     revokeSession(sessionUuid)
       .then(() => {
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.uuid === sessionUuid
-              ? { ...s, active: false, revokedAt: new Date().toISOString() }
-              : s,
-          ),
-        );
+        // Note: This is optimistic local state update
+        // A full solution would use query invalidation or refetch
+        window.location.reload();
       })
       .catch((err) => {
-        setError(err.message || "Failed to revoke session");
+        setRevokeError(err.message || "Failed to revoke session");
       });
   };
 
@@ -64,7 +49,9 @@ export function AccountSessionsPage() {
     return (
       <Container className="p-6 flex flex-col gap-4">
         <h1 className="text-2xl font-semibold">Sessions</h1>
-        <p className="text-destructive">{error}</p>
+        <p className="text-destructive">
+          {error.message || "Failed to load sessions"}
+        </p>
       </Container>
     );
   }
@@ -72,6 +59,8 @@ export function AccountSessionsPage() {
   return (
     <Container className="p-6 flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">Sessions</h1>
+
+      {revokeError && <p className="text-destructive text-sm">{revokeError}</p>}
 
       <MockOverlay className="w-fit">
         <Button variant="destructive" onClick={handleRevokeAll}>
