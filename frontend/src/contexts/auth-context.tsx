@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { jwtDecode } from "jwt-decode";
-import type { User, LoginRequest } from "@/lib/api";
+import type { User } from "@/lib/api/types";
+import type { LoginRequest } from "@/lib/api/auth";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -8,8 +9,8 @@ import {
   getAccessToken,
   getRefreshToken,
   clearTokens,
-  ApiError,
-} from "@/lib/api";
+} from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
 
 interface AuthState {
   user: User | null;

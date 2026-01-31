@@ -9,7 +9,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteUser } from "@/lib/api";
+import { deleteUser } from "@/lib/api/users";
+import { useAsyncFn } from "@/hooks/use-async";
 
 interface DeleteUserDialogProps {
   userUuid: string;
@@ -25,28 +26,20 @@ export function DeleteUserDialog({
   onSuccess,
 }: DeleteUserDialogProps) {
   const [open, setOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [{ loading, error }, executeDelete, reset] = useAsyncFn(deleteUser);
 
   const handleOpenChange = (open: boolean) => {
     setOpen(open);
     if (!open) {
-      setError(null);
+      reset();
     }
   };
 
   const handleDelete = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await deleteUser(userUuid);
+    await executeDelete(userUuid);
+    if (!error) {
       setOpen(false);
       onSuccess?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete user");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -60,7 +53,11 @@ export function DeleteUserDialog({
           undone.
         </DialogDescription>
 
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        {error && (
+          <p className="text-destructive text-sm">
+            {error instanceof Error ? error.message : "Failed to delete user"}
+          </p>
+        )}
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>
@@ -69,9 +66,9 @@ export function DeleteUserDialog({
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={isLoading}
+            disabled={loading}
           >
-            {isLoading ? "Deleting..." : "Delete User"}
+            {loading ? "Deleting..." : "Delete User"}
           </Button>
         </DialogFooter>
       </DialogContent>

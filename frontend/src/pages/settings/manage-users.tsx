@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Container } from "@/components/container";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { listUsers, type UserListItem } from "@/lib/api";
+import { listUsers } from "@/lib/api/users";
+import type { UserListItem } from "@/lib/api/users";
 import {
   LucideKeyRound,
   LucideShieldOff,
@@ -17,24 +18,17 @@ import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { RemoveTotpDialog } from "./manage-users/remove-totp-dialog";
 import { DeleteUserDialog } from "./manage-users/delete-user-dialog";
 import { CreateUserDialog } from "./manage-users/create-user-dialog";
+import { useAsync } from "@/hooks/use-async";
 
 export function ManageUsersPage() {
   const navigate = useNavigate();
-  const [users, setUsers] = useState<UserListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: usersData, loading, error } = useAsync(listUsers);
+  const [users, setUsers] = useState<UserListItem[]>(usersData?.items ?? []);
 
-  useEffect(() => {
-    listUsers()
-      .then((response) => {
-        setUsers(response.items);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || "Failed to load users");
-        setLoading(false);
-      });
-  }, []);
+  // Sync users state when data changes
+  if (usersData && users.length === 0 && usersData.items.length > 0) {
+    setUsers(usersData.items);
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -56,7 +50,9 @@ export function ManageUsersPage() {
       <>
         <Header title="Manage Users" backHref="/settings" />
         <div className="p-6">
-          <p className="text-destructive">{error}</p>
+          <p className="text-destructive">
+            {error.message || "Failed to load users"}
+          </p>
         </div>
       </>
     );

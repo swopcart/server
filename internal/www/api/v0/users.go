@@ -29,11 +29,11 @@ func (h *APIHandlers) userList(c *gin.Context) {
 	users, total, err := h.services.Identity.GetAllUsers(ctx, PageSize, req.Offset)
 	if err != nil {
 		l.Error("Failed to get users", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
-	response := Paginated[gin.H]{
+	response := PaginatedResponse[gin.H]{
 		Offset: uint(req.Offset),
 		Total:  total,
 		Items:  make([]gin.H, 0, len(users)),
@@ -59,7 +59,7 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 	// Parse target user UUID from URL
 	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid user UUID")
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 		NewPassword     string  `json:"newPassword" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindingError(c, err)
 		return
 	}
 
@@ -86,11 +86,11 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 	targetUser, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
 	if err != nil {
 		if errors.Is(err, identity.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			respondWithIdentityError(c, err, http.StatusNotFound)
 			return
 		}
 		l.Error("Failed to get target user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 	// Authorization: non-admins can only change their own password
 	isOwnPassword := currentUser.UUID() == targetUser.UUID()
 	if !isOwnPassword && !currentUser.Admin() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only change your own password"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyOwnResource, "You can only change your own password")
 		return
 	}
 
@@ -111,17 +111,17 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 
 	if mustCheckPassword {
 		if req.CurrentPassword == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Current password is required"})
+			respondFieldError(c, http.StatusBadRequest, ErrCodePasswordRequired, "Current password is required", ".currentPassword")
 			return
 		}
 
 		if err := targetUser.CheckPassword(*req.CurrentPassword); err != nil {
 			if errors.Is(err, identity.ErrIncorrectPassword) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Current password is incorrect"})
+				respondFieldError(c, http.StatusUnauthorized, ErrCodePasswordIncorrect, "Current password is incorrect", ".currentPassword")
 				return
 			}
 			l.Error("Failed to check password", "err", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify password"})
+			c.Status(http.StatusInternalServerError)
 			return
 		}
 	}
@@ -131,11 +131,12 @@ func (h *APIHandlers) userChangePassword(c *gin.Context) {
 		if errors.Is(err, identity.ErrPasswordTooShort) ||
 			errors.Is(err, identity.ErrPasswordTooLong) ||
 			errors.Is(err, identity.ErrPasswordNotComplex) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			code, message, _ := mapIdentityError(err)
+			respondFieldError(c, http.StatusBadRequest, code, message, ".newPassword")
 			return
 		}
 		l.Error("Failed to set password", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to change password"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -150,7 +151,7 @@ func (h *APIHandlers) userGetDetails(c *gin.Context) {
 	// Parse target user UUID from URL
 	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid user UUID")
 		return
 	}
 
@@ -159,7 +160,7 @@ func (h *APIHandlers) userGetDetails(c *gin.Context) {
 	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -167,18 +168,18 @@ func (h *APIHandlers) userGetDetails(c *gin.Context) {
 	targetUser, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
 	if err != nil {
 		if errors.Is(err, identity.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			respondWithIdentityError(c, err, http.StatusNotFound)
 			return
 		}
 		l.Error("Failed to get target user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	// Authorization: non-admins can only view their own details
 	isOwnDetails := currentUser.UUID() == targetUser.UUID()
 	if !isOwnDetails && !currentUser.Admin() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only view your own details"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyOwnResource, "You can only view your own details")
 		return
 	}
 
@@ -197,7 +198,7 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 	// Parse target user UUID from URL
 	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid user UUID")
 		return
 	}
 
@@ -206,7 +207,7 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -215,7 +216,7 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 		Password *string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindingError(c, err)
 		return
 	}
 
@@ -223,11 +224,11 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 	targetUser, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
 	if err != nil {
 		if errors.Is(err, identity.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			respondWithIdentityError(c, err, http.StatusNotFound)
 			return
 		}
 		l.Error("Failed to get target user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -236,7 +237,7 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 	// Authorization: non-admins can only generate TOTP for themselves
 	isOwnTOTP := currentUser.UUID() == targetUser.UUID()
 	if !isOwnTOTP && !currentUser.Admin() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only set up TOTP for yourself"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyOwnResource, "You can only set up TOTP for yourself")
 		return
 	}
 
@@ -245,17 +246,17 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 
 	if mustCheckPassword {
 		if req.Password == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
+			respondFieldError(c, http.StatusBadRequest, ErrCodePasswordRequired, "Password is required", ".password")
 			return
 		}
 
 		if err := targetUser.CheckPassword(*req.Password); err != nil {
 			if errors.Is(err, identity.ErrIncorrectPassword) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Password is incorrect"})
+				respondFieldError(c, http.StatusUnauthorized, ErrCodePasswordIncorrect, "Password is incorrect", ".password")
 				return
 			}
 			l.Error("Failed to check password", "err", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify password"})
+			c.Status(http.StatusInternalServerError)
 			return
 		}
 	}
@@ -264,7 +265,7 @@ func (h *APIHandlers) userGenerateTOTP(c *gin.Context) {
 	pending, err := h.services.Identity.GenerateTOTP(targetUser.UUID(), targetUser.Username())
 	if err != nil {
 		l.Error("Failed to generate TOTP", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate TOTP"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -282,7 +283,7 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 	// Parse target user UUID from URL
 	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid user UUID")
 		return
 	}
 
@@ -291,7 +292,7 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -301,7 +302,7 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 		Token  string `json:"token" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindingError(c, err)
 		return
 	}
 
@@ -309,11 +310,11 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 	targetUser, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
 	if err != nil {
 		if errors.Is(err, identity.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			respondWithIdentityError(c, err, http.StatusNotFound)
 			return
 		}
 		l.Error("Failed to get target user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -322,30 +323,30 @@ func (h *APIHandlers) userEnableTOTP(c *gin.Context) {
 	// Authorization: non-admins can only enable TOTP for themselves
 	isOwnTOTP := currentUser.UUID() == targetUser.UUID()
 	if !isOwnTOTP && !currentUser.Admin() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only set up TOTP for yourself"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyOwnResource, "You can only set up TOTP for yourself")
 		return
 	}
 
 	// Verify secret matches the pending secret
 	pending := h.services.Identity.GetPendingTOTP(targetUser.UUID())
 	if pending == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No pending TOTP secret found. Please generate a new secret first."})
+		respondWithIdentityError(c, identity.ErrTOTPNotPending, http.StatusBadRequest)
 		return
 	}
 
 	if pending.Secret != req.Secret {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Secret does not match pending secret"})
+		respondWithIdentityError(c, identity.ErrTOTPSecretMismatch, http.StatusBadRequest)
 		return
 	}
 
 	// Enable TOTP (this also validates the token)
 	if err := targetUser.EnableTOTP(ctx, req.Secret, req.Token); err != nil {
 		if errors.Is(err, identity.ErrInvalidTOTP) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid TOTP token"})
+			respondFieldError(c, http.StatusBadRequest, ErrCodeInvalidTOTP, "Invalid TOTP token", ".token")
 			return
 		}
 		l.Error("Failed to enable TOTP", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enable TOTP"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -363,7 +364,7 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	// Parse target user UUID from URL
 	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid user UUID")
 		return
 	}
 
@@ -372,7 +373,7 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	currentUser, err := h.services.Identity.GetUserByUUID(ctx, sessionData.UserUUID)
 	if err != nil {
 		l.Error("Failed to get current user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get current user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -381,7 +382,7 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 		Password *string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindingError(c, err)
 		return
 	}
 
@@ -389,11 +390,11 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	targetUser, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
 	if err != nil {
 		if errors.Is(err, identity.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			respondWithIdentityError(c, err, http.StatusNotFound)
 			return
 		}
 		l.Error("Failed to get target user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -402,7 +403,7 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	// Authorization: non-admins can only disable TOTP for themselves
 	isOwnTOTP := currentUser.UUID() == targetUser.UUID()
 	if !isOwnTOTP && !currentUser.Admin() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You can only disable TOTP for yourself"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyOwnResource, "You can only disable TOTP for yourself")
 		return
 	}
 
@@ -411,17 +412,17 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 
 	if mustCheckPassword {
 		if req.Password == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
+			respondFieldError(c, http.StatusBadRequest, ErrCodePasswordRequired, "Password is required", ".password")
 			return
 		}
 
 		if err := targetUser.CheckPassword(*req.Password); err != nil {
 			if errors.Is(err, identity.ErrIncorrectPassword) {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Password is incorrect"})
+				respondFieldError(c, http.StatusUnauthorized, ErrCodePasswordIncorrect, "Password is incorrect", ".password")
 				return
 			}
 			l.Error("Failed to check password", "err", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify password"})
+			c.Status(http.StatusInternalServerError)
 			return
 		}
 	}
@@ -429,11 +430,11 @@ func (h *APIHandlers) userDisableTOTP(c *gin.Context) {
 	// Disable TOTP
 	if err := targetUser.DisableTOTP(ctx); err != nil {
 		if errors.Is(err, identity.ErrTOTPNotEnabled) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "TOTP is not enabled"})
+			respondWithIdentityError(c, err, http.StatusBadRequest)
 			return
 		}
 		l.Error("Failed to disable TOTP", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to disable TOTP"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -447,7 +448,7 @@ func (h *APIHandlers) userCreate(c *gin.Context) {
 
 	// Check admin from JWT token claims
 	if !getSessionData(c).Admin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can create users"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyAdmins, "Only admins can create users")
 		return
 	}
 
@@ -458,7 +459,7 @@ func (h *APIHandlers) userCreate(c *gin.Context) {
 		Admin    bool   `json:"admin"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondBindingError(c, err)
 		return
 	}
 
@@ -468,21 +469,27 @@ func (h *APIHandlers) userCreate(c *gin.Context) {
 	newUser, err := h.services.Identity.CreateUser(ctx, req.Username, req.Password, req.Admin)
 	if err != nil {
 		if errors.Is(err, identity.ErrUserAlreadyExists) {
-			c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
+			code, message, _ := mapIdentityError(err)
+			respondFieldError(c, http.StatusConflict, code, message, ".username")
 			return
 		}
 		if errors.Is(err, identity.ErrUsernameTooShort) ||
 			errors.Is(err, identity.ErrUsernameTooLong) ||
 			errors.Is(err, identity.ErrUsernameInvalidChars) ||
-			errors.Is(err, identity.ErrUsernameStartsWithDigit) ||
-			errors.Is(err, identity.ErrPasswordTooShort) ||
+			errors.Is(err, identity.ErrUsernameStartsWithDigit) {
+			code, message, _ := mapIdentityError(err)
+			respondFieldError(c, http.StatusBadRequest, code, message, ".username")
+			return
+		}
+		if errors.Is(err, identity.ErrPasswordTooShort) ||
 			errors.Is(err, identity.ErrPasswordTooLong) ||
 			errors.Is(err, identity.ErrPasswordNotComplex) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			code, message, _ := mapIdentityError(err)
+			respondFieldError(c, http.StatusBadRequest, code, message, ".password")
 			return
 		}
 		l.Error("Failed to create user", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -502,14 +509,14 @@ func (h *APIHandlers) userListSessions(c *gin.Context) {
 
 	// Check admin from JWT token claims
 	if !getSessionData(c).Admin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only admins can view other users' sessions"})
+		respondError(c, http.StatusForbidden, ErrCodeOnlyAdmins, "Only admins can view other users' sessions")
 		return
 	}
 
 	// Parse target user UUID from URL
 	targetUUID, err := uuid.Parse(c.Param("user_uuid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user UUID"})
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid user UUID")
 		return
 	}
 
@@ -529,8 +536,12 @@ func (h *APIHandlers) userListSessions(c *gin.Context) {
 	// Get the target user
 	user, err := h.services.Identity.GetUserByUUID(ctx, targetUUID)
 	if err != nil {
+		if errors.Is(err, identity.ErrNotFound) {
+			respondWithIdentityError(c, err, http.StatusNotFound)
+			return
+		}
 		l.Error("Failed to get user", "err", err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -542,7 +553,7 @@ func (h *APIHandlers) userListSessions(c *gin.Context) {
 		return
 	}
 
-	response := Paginated[gin.H]{
+	response := PaginatedResponse[gin.H]{
 		Offset: uint(req.Offset),
 		Total:  total,
 		Items:  make([]gin.H, 0, len(sessions)),

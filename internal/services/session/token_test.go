@@ -308,3 +308,37 @@ func TestTokenPair(t *testing.T) {
 		t.Errorf("expected RefreshToken %q, got %q", "refresh-token-value", pair.RefreshToken)
 	}
 }
+
+func TestGetSessionDataFromAccessToken(t *testing.T) {
+	svc := testServiceForToken(t)
+	sessionUUID := uuid.MustParse("0b0676d1-9335-4f35-9f30-a84dfb795168")
+	userUUID := uuid.MustParse("2ee2ac40-de2e-4536-87e3-6fb804bb5d18")
+	username := "admin"
+	admin := true
+
+	// Generate a token
+	token, err := svc.generateAccessToken(sessionUUID, userUUID, username, admin)
+	if err != nil {
+		t.Fatalf("generateAccessToken failed: %v", err)
+	}
+
+	// Parse it back using GetSessionDataFromAccessToken
+	sessionData, err := svc.GetSessionDataFromAccessToken(token)
+	if err != nil {
+		t.Fatalf("GetSessionDataFromAccessToken failed: %v", err)
+	}
+
+	// Verify the fields
+	if sessionData.SessionUUID != sessionUUID {
+		t.Errorf("SessionUUID mismatch: got %v, want %v", sessionData.SessionUUID, sessionUUID)
+	}
+
+	if sessionData.UserUUID != userUUID {
+		t.Errorf("UserUUID mismatch: got %v (zero: %v), want %v",
+			sessionData.UserUUID, uuid.UUID{}, userUUID)
+	}
+
+	if sessionData.Admin != admin {
+		t.Errorf("Admin mismatch: got %v, want %v", sessionData.Admin, admin)
+	}
+}
