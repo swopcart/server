@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -73,13 +74,10 @@ func main() {
 
 // registerJobs calls RegisterJobs on each service that implements it
 func registerJobs(svc *services.Services) error {
-	// Currently no services have jobs to register
-	// Services can add RegisterJobs methods as needed
-
-	// Example for when services implement RegisterJobs:
-	// if err := svc.Session.RegisterJobs(svc.Jobs); err != nil {
-	//     return fmt.Errorf("session jobs: %w", err)
-	// }
+	// Register cleanup jobs
+	if err := svc.Cleanup.RegisterJobs(svc.Jobs); err != nil {
+		return fmt.Errorf("failed to register cleanup jobs: %w", err)
+	}
 
 	return nil
 }

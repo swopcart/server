@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swopcart/server/internal/config"
@@ -28,10 +29,37 @@ type Harness struct {
 	Router   *gin.Engine
 }
 
+// HarnessOption configures the test harness.
+type HarnessOption func(*harnessConfig)
+
+type harnessConfig struct {
+	useTransaction bool
+}
+
+// WithoutTransaction disables transaction-based isolation.
+// Use this for tests that need committed data (e.g., testing async workers).
+// When using this option, tests must manually clean up data.
+func WithoutTransaction() HarnessOption {
+	return func(cfg *harnessConfig) {
+		cfg.useTransaction = false
+	}
+}
+
 // New creates a new test harness. It reads the database connection string from
 // the SWOPCART_TEST_DB environment variable.
-func New(t *testing.T) *Harness {
+//
+// By default, tests run within a transaction that is rolled back on completion.
+// Use WithoutTransaction() for tests that need committed data.
+func New(t *testing.T, opts ...HarnessOption) *Harness {
 	t.Helper()
+
+	// Parse options
+	hCfg := &harnessConfig{
+		useTransaction: true, // Default to transaction-based isolation
+	}
+	for _, opt := range opts {
+		opt(hCfg)
+	}
 
 	connStr := os.Getenv("SWOPCART_TEST_DB")
 	if connStr == "" {
@@ -59,6 +87,11 @@ func New(t *testing.T) *Harness {
 			RefreshTokenTTL: 90,  // 90 days
 			JWTIssuer:       "swopcart-test",
 		},
+		Jobs: config.Jobs{
+			DefaultWorkers:  2, // Minimal workers for tests
+			ShutdownTimeout: 5 * time.Second,
+			Queues:          make(map[string]config.QueueConfig),
+		},
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -68,25 +101,40 @@ func New(t *testing.T) *Harness {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
 
-	// Start a transaction that will be rolled back at the end of the test.
-	// This ensures each test runs in isolation with a clean database state.
-	tx := db.Begin()
-	if tx.Error != nil {
-		t.Fatalf("failed to begin transaction: %v", tx.Error)
-	}
-
-	t.Cleanup(func() {
-		tx.Rollback()
-		sqlDB, _ := db.DB()
-		if sqlDB != nil {
-			_ = sqlDB.Close()
+	var dbConn *gorm.DB
+	if hCfg.useTransaction {
+		// Start a transaction that will be rolled back at the end of the test.
+		// This ensures each test runs in isolation with a clean database state.
+		tx := db.Begin()
+		if tx.Error != nil {
+			t.Fatalf("failed to begin transaction: %v", tx.Error)
 		}
-	})
+
+		t.Cleanup(func() {
+			tx.Rollback()
+			sqlDB, _ := db.DB()
+			if sqlDB != nil {
+				_ = sqlDB.Close()
+			}
+		})
+
+		dbConn = tx
+	} else {
+		// No transaction - tests must manually clean up data
+		t.Cleanup(func() {
+			sqlDB, _ := db.DB()
+			if sqlDB != nil {
+				_ = sqlDB.Close()
+			}
+		})
+
+		dbConn = db
+	}
 
 	ctx := context.Background()
 
-	// Services use the transaction, not the raw db connection
-	svcs, err := services.NewServices(ctx, cfg, logger, tx)
+	// Services use the transaction (or raw db if no transaction)
+	svcs, err := services.NewServices(ctx, cfg, logger, dbConn)
 	if err != nil {
 		t.Fatalf("failed to create services: %v", err)
 	}
@@ -98,7 +146,7 @@ func New(t *testing.T) *Harness {
 		T:        t,
 		Config:   cfg,
 		Logger:   logger,
-		DB:       tx, // expose the transaction as DB so all operations use it
+		DB:       dbConn,
 		Services: svcs,
 		Router:   router,
 	}
