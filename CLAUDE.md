@@ -86,6 +86,55 @@ Tests require PostgreSQL. Configure via `SWOPCART_TEST_DB` env var or use defaul
 SWOPCART_TEST_DB="postgres://user:pass@host:5432/dbname" go test -v -race ./...
 ```
 
+### Testing Philosophy
+This project prioritizes **behavioral testing over implementation testing**. Tests should verify what a system does, not how it does it internally.
+
+**Core principles:**
+- **External tests preferred**: Use `package X_test` instead of `package X` to test only the public API
+- **Behavior, not internals**: Test observable behavior (API responses, database state, execution results) rather than internal fields, private functions, or implementation details
+- **Use testkit**: All service tests use `testkit.New(t)` for isolation with automatic DB transaction rollback
+- **Async tests**: Use `testkit.WithoutTransaction()` for tests with background workers/goroutines; call `tk.ResetDB()` before and after test
+
+**What to test:**
+- Public API behavior (RegisterHandler, EnqueueJob, GetExecution)
+- Observable outcomes (job executes, database records created/updated, errors returned)
+- Integration behavior (parameters merge correctly, queues process independently)
+- Edge cases (missing handlers, invalid schedules, concurrent execution)
+
+**What NOT to test:**
+- Private fields (svc.handlers, svc.cron, svc.workers)
+- Private functions (serializeParams, mergeParams, getHostname)
+- Implementation details (checking internal state, testing helpers)
+
+**Example:**
+```go
+// Good: Tests observable behavior
+func TestEnqueueJob(t *testing.T) {
+    tk := testkit.New(t, testkit.WithoutTransaction())
+    tk.ResetDB()
+    defer tk.ResetDB()
+
+    svc := tk.Services.Jobs
+
+    // Verify job executes and updates database
+    executionUUID, err := svc.EnqueueJob(ctx, "test_job")
+    if err != nil {
+        t.Fatalf("Failed to enqueue: %v", err)
+    }
+
+    // Verify observable outcome in database
+    var execution database.JobExecution
+    err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
+    // ... check status, duration, etc.
+}
+
+// Bad: Tests internal implementation
+func TestInternalHandlerMap(t *testing.T) {
+    svc := NewJobService(...)
+    // Don't test private svc.handlers map directly
+}
+```
+
 ## Architecture
 
 **Monorepo with embedded frontend**: Go backend embeds the built React frontend via `go:embed` directive in `frontend/embed.go`.
