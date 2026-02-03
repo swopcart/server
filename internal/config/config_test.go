@@ -28,6 +28,11 @@ func TestLoadConfig(t *testing.T) {
 			RefreshTokenTTL: 365,
 			JWTIssuer:       "foobar",
 		},
+		Jobs: config.Jobs{
+			DefaultWorkers:  16,          // runtime.NumCPU() default
+			ShutdownTimeout: 30000000000, // 30 seconds in nanoseconds
+			Queues:          map[string]config.QueueConfig{},
+		},
 	}
 
 	err := os.WriteFile(configPath, []byte(`

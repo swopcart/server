@@ -38,7 +38,11 @@ type harnessConfig struct {
 
 // WithoutTransaction disables transaction-based isolation.
 // Use this for tests that need committed data (e.g., testing async workers).
-// When using this option, tests must manually clean up data.
+// When using this option, tests should call ResetDB() before and after to ensure isolation:
+//
+//	tk := testkit.New(t, testkit.WithoutTransaction())
+//	tk.ResetDB()         // Clean to known state
+//	defer tk.ResetDB()   // Clean up after test
 func WithoutTransaction() HarnessOption {
 	return func(cfg *harnessConfig) {
 		cfg.useTransaction = false
@@ -183,4 +187,26 @@ func (h *Harness) PUT(path string, body io.Reader) *httptest.ResponseRecorder {
 // DELETE performs a DELETE request against the test router.
 func (h *Harness) DELETE(path string) *httptest.ResponseRecorder {
 	return h.Request(http.MethodDelete, path, nil)
+}
+
+// ResetDB removes all data from all tables, resetting the database to an empty state.
+// This is useful for tests that use WithoutTransaction() and need to clean up between tests.
+// Tables are truncated in an order that respects foreign key constraints.
+func (h *Harness) ResetDB() {
+	h.T.Helper()
+
+	// Delete in order respecting foreign keys
+	// JobExecution -> Job, Session -> User
+	tables := []string{
+		"job_executions",
+		"jobs",
+		"sessions",
+		"users",
+	}
+
+	for _, table := range tables {
+		if err := h.DB.Exec("TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE").Error; err != nil {
+			h.T.Fatalf("failed to truncate table %s: %v", table, err)
+		}
+	}
 }
