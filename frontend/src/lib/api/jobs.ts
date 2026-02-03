@@ -17,9 +17,9 @@ export const JobSchema = z.object({
   enabled: z.boolean(),
   priority: z.number(),
   queue: z.string(),
-  default_parameters: z.string().nullable(),
-  last_run_at: z.string().nullable(),
-  next_run_at: z.string().nullable(),
+  defaultParameters: z.string().nullable(),
+  lastRunAt: z.string().nullable(),
+  nextRunAt: z.string().nullable(),
 });
 
 export type Job = z.infer<typeof JobSchema>;
@@ -27,25 +27,25 @@ export type Job = z.infer<typeof JobSchema>;
 // Job execution schemas
 export const JobExecutionSchema = z.object({
   uuid: z.string(),
-  job_name: z.string(),
+  jobId: z.number(),
   parameters: z.string().nullable(),
-  started_at: z.string(),
-  completed_at: z.string().nullable(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable(),
   duration: z.number().nullable(),
   status: z.string(), // "pending", "running", "completed", "failed"
   output: z.string().nullable(),
   error: z.string().nullable(),
-  trigger_type: z.string(),
-  records_complete: z.number(),
-  records_total: z.number(),
-  current_record: z.string().nullable(),
+  triggerType: z.string(),
+  recordsComplete: z.number(),
+  recordsTotal: z.number(),
+  currentRecord: z.string().nullable(),
 });
 
 export type JobExecution = z.infer<typeof JobExecutionSchema>;
 
 // Trigger response
 export const TriggerJobResponseSchema = z.object({
-  execution_uuid: z.string(),
+  executionUuid: z.string(),
   status: z.string(),
 });
 
