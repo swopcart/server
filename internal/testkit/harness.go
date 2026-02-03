@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -195,16 +196,23 @@ func (h *Harness) DELETE(path string) *httptest.ResponseRecorder {
 func (h *Harness) ResetDB() {
 	h.T.Helper()
 
-	// Delete in order respecting foreign keys
-	// JobExecution -> Job, Session -> User
-	tables := []string{
-		"job_executions",
-		"jobs",
-		"sessions",
-		"users",
-	}
+	models := func() (m []any) {
+		m = slices.Clone(database.Models)
+		slices.Reverse(m)
+		return
+	}()
 
-	for _, table := range tables {
+	for _, model := range models {
+		table := func() string {
+			stmt := &gorm.Statement{DB: h.DB}
+			if err := stmt.Parse(model); err != nil {
+				h.T.Logf("can't get table name: %v", err)
+				h.T.FailNow()
+			}
+
+			return stmt.Schema.Table
+		}()
+
 		if err := h.DB.Exec("TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE").Error; err != nil {
 			h.T.Fatalf("failed to truncate table %s: %v", table, err)
 		}

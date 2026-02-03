@@ -7,6 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
+// The models
+var Models = []any{
+	&User{},
+	&Session{},
+	&Job{},
+	&JobExecution{},
+}
+
 type User struct {
 	gorm.Model
 

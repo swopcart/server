@@ -36,10 +36,5 @@ func initDatabase(config *config.Config, l *slog.Logger) (db *gorm.DB, err error
 }
 
 func migrate(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&User{},
-		&Session{},
-		&Job{},
-		&JobExecution{},
-	)
+	return db.AutoMigrate(Models...)
 }
