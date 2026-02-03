@@ -27,9 +27,9 @@ func (h *APIHandlers) jobsList(c *gin.Context) {
 		Enabled           bool      `json:"enabled"`
 		Priority          int       `json:"priority"`
 		Queue             string    `json:"queue"`
-		DefaultParameters *string   `json:"default_parameters"`
-		LastRunAt         *string   `json:"last_run_at"`
-		NextRunAt         *string   `json:"next_run_at"`
+		DefaultParameters *string   `json:"defaultParameters"`
+		LastRunAt         *string   `json:"lastRunAt"`
+		NextRunAt         *string   `json:"nextRunAt"`
 	}
 
 	if err := h.services.Jobs.DB().WithContext(ctx).
@@ -62,9 +62,9 @@ func (h *APIHandlers) jobsGetDetails(c *gin.Context) {
 		Enabled           bool      `json:"enabled"`
 		Priority          int       `json:"priority"`
 		Queue             string    `json:"queue"`
-		DefaultParameters *string   `json:"default_parameters"`
-		LastRunAt         *string   `json:"last_run_at"`
-		NextRunAt         *string   `json:"next_run_at"`
+		DefaultParameters *string   `json:"defaultParameters"`
+		LastRunAt         *string   `json:"lastRunAt"`
+		NextRunAt         *string   `json:"nextRunAt"`
 	}
 
 	if err := h.services.Jobs.DB().WithContext(ctx).
@@ -151,8 +151,8 @@ func (h *APIHandlers) jobsTrigger(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"execution_uuid": executionUUID,
-		"status":         "enqueued",
+		"executionUuid": executionUUID,
+		"status":        "enqueued",
 	})
 }
 

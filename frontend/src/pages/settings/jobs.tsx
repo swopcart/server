@@ -54,7 +54,7 @@ export function JobsPage() {
 
   const canTrigger = (job: Job): boolean => {
     // Can trigger if no parameters required or all have defaults
-    return job.default_parameters !== null || job.default_parameters === null;
+    return job.defaultParameters !== null || job.defaultParameters === null;
   };
 
   const handleToggleEnabled = async (job: Job, enabled: boolean) => {
@@ -79,9 +79,9 @@ export function JobsPage() {
 
     // Parse default parameters if they exist
     let parameters: Record<string, string> | undefined;
-    if (job.default_parameters) {
+    if (job.defaultParameters) {
       try {
-        parameters = JSON.parse(job.default_parameters);
+        parameters = JSON.parse(job.defaultParameters);
       } catch {
         // If parsing fails, trigger without parameters
         parameters = undefined;
@@ -213,12 +213,12 @@ export function JobsPage() {
                 <div className="flex gap-4 flex-wrap">
                   <div>
                     <span className="font-medium">Last run:</span>{" "}
-                    {formatDate(job.last_run_at)}
+                    {formatDate(job.lastRunAt)}
                   </div>
-                  {job.next_run_at && (
+                  {job.nextRunAt && (
                     <div>
                       <span className="font-medium">Next run:</span>{" "}
-                      {formatDate(job.next_run_at)}
+                      {formatDate(job.nextRunAt)}
                     </div>
                   )}
                 </div>

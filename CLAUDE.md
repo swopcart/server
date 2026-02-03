@@ -163,6 +163,7 @@ func TestInternalHandlerMap(t *testing.T) {
 - **Services container**: `services.Services` holds all service instances; services receive dependencies via constructor injection
 - **Test harness**: `testkit.New(t)` provides isolated test environment with DB transaction rollback
 - **API versioning**: Routes under `/api/v0/` with `APIHandlers.InstallRoutes()` pattern
+- **JSON naming**: All JSON API responses use **camelCase** field names for consistency with JavaScript conventions (e.g., `defaultParameters`, `lastRunAt`, not `default_parameters`, `last_run_at`)
 - **Logging**: Structured slog with context groups per service
 - **Graceful shutdown**: Signal handling (SIGINT, SIGTERM)
 - **Frontend proxy**: Dev server proxies `/api/*` to backend at :8000
