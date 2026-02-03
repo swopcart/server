@@ -65,6 +65,16 @@ func newTestHarness(t *testing.T) *testHarness {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}
 
+	// Clean up any committed data from previous test runs
+	// This ensures tests don't see leftover data when using transactions
+	tables := []string{"job_executions", "jobs", "sessions", "users"}
+	for _, table := range tables {
+		if err := db.Exec("DELETE FROM " + table).Error; err != nil {
+			// Ignore errors for tables that don't exist
+			t.Logf("warning: failed to clean table %s: %v", table, err)
+		}
+	}
+
 	// Start a transaction for isolation
 	tx := db.Begin()
 	if tx.Error != nil {

@@ -75,6 +75,12 @@ func TestCleanupDeletesOldRecords(t *testing.T) {
 	// Use WithoutTransaction so async workers can see committed data
 	tk := testkit.New(t, testkit.WithoutTransaction())
 
+	// Clean database to known state before test
+	tk.ResetDB()
+
+	// Clean database after test completes
+	defer tk.ResetDB()
+
 	// Create and register cleanup service
 	cleanupSvc, err := cleanup.NewCleanupService(tk.T.Context(), tk.Config, tk.Logger, tk.DB)
 	if err != nil {
@@ -104,14 +110,6 @@ func TestCleanupDeletesOldRecords(t *testing.T) {
 	if err := tk.DB.Create(activeUser).Error; err != nil {
 		t.Fatalf("Failed to create active user: %v", err)
 	}
-
-	// Manual cleanup
-	defer func() {
-		tk.DB.Unscoped().Delete(&oldUser1)
-		tk.DB.Unscoped().Delete(&oldUser2)
-		tk.DB.Unscoped().Delete(&recentUser)
-		tk.DB.Unscoped().Delete(&activeUser)
-	}()
 
 	// Enqueue the cleanup job
 	executionUUID, err := tk.Services.Jobs.EnqueueJob(
