@@ -52,8 +52,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="p-4">
-        <h1 className="text-lg font-semibold">Swopcart</h1>
+      <SidebarHeader className="flex h-14 justify-center px-4">
+        <h1 className="text-base font-semibold">Swopcart</h1>
       </SidebarHeader>
 
       <SidebarSeparator />

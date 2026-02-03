@@ -214,3 +214,49 @@ func (h *APIHandlers) jobsGetExecution(c *gin.Context) {
 
 	c.JSON(http.StatusOK, execution)
 }
+
+// jobsUpdateSettings updates job settings (currently only enabled field)
+func (h *APIHandlers) jobsUpdateSettings(c *gin.Context) {
+	sessionData := getSessionData(c)
+	if !sessionData.Admin {
+		respondError(c, http.StatusForbidden, ErrCodeOnlyAdmins, "Only admins can update jobs")
+		return
+	}
+
+	jobName := c.Param("job_name")
+	ctx := c.Request.Context()
+
+	var req struct {
+		Enabled *bool `json:"enabled"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidRequest, "Invalid request body")
+		return
+	}
+
+	// Validate that at least one field is provided
+	if req.Enabled == nil {
+		respondError(c, http.StatusBadRequest, ErrCodeInvalidRequest, "No fields to update")
+		return
+	}
+
+	// Update the job
+	result := h.services.Jobs.DB().WithContext(ctx).
+		Table("jobs").
+		Where("name = ?", jobName).
+		Update("enabled", *req.Enabled)
+
+	if result.Error != nil {
+		h.getLogger(c).Error("Failed to update job", "err", result.Error, "job", jobName)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if result.RowsAffected == 0 {
+		respondError(c, http.StatusNotFound, ErrCodeJobNotFound, "Job not found")
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
