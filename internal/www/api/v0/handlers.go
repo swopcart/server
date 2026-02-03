@@ -69,6 +69,7 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 		jobs.GET("/executions/recent", h.jobsListRecentExecutions)
 		jobs.GET("/executions/:execution_uuid", h.jobsGetExecution)
 		jobs.GET("/:job_name", h.jobsGetDetails)
+		jobs.PATCH("/:job_name", h.jobsUpdateSettings)
 		jobs.GET("/:job_name/history", h.jobsGetHistory)
 		jobs.POST("/:job_name/trigger", h.jobsTrigger)
 	}
