@@ -15,8 +15,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// Params is a convenience alias for job parameters, similar to gin.H
+type Params map[string]string
+
 // JobHandler is the function signature for job execution
-type JobHandler func(ctx context.Context, logger *slog.Logger, params map[string]string, progress ProgressReporter) error
+type JobHandler func(ctx context.Context, logger *slog.Logger, params Params, progress ProgressReporter) error
 
 // ProgressReporter allows jobs to report their progress
 type ProgressReporter interface {
@@ -190,7 +193,7 @@ func (svc *JobService) ListRecentExecutions(
 
 // Helper functions for parameter serialization
 
-func serializeParams(params map[string]string) (*string, error) {
+func serializeParams(params Params) (*string, error) {
 	if len(params) == 0 {
 		return nil, nil
 	}
@@ -204,7 +207,7 @@ func serializeParams(params map[string]string) (*string, error) {
 	return &str, nil
 }
 
-func deserializeParams(data *string) (map[string]string, error) {
+func deserializeParams(data *string) (Params, error) {
 	if data == nil {
 		return make(map[string]string), nil
 	}
@@ -219,7 +222,7 @@ func deserializeParams(data *string) (map[string]string, error) {
 
 // mergeParams merges runtime parameters with default parameters
 // Runtime parameters override defaults
-func mergeParams(defaults, runtime map[string]string) map[string]string {
+func mergeParams(defaults, runtime Params) Params {
 	merged := make(map[string]string)
 
 	// Copy defaults

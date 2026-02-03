@@ -25,7 +25,7 @@ type jobTask struct {
 	job       database.Job
 	execution database.JobExecution
 	handler   JobHandler
-	params    map[string]string
+	params    Params
 }
 
 type progressReporter struct {
