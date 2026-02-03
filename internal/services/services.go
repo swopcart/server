@@ -15,9 +15,8 @@ import (
 )
 
 type Services struct {
-	context     context.Context
-	config      *config.Config
-	serviceList []string
+	context context.Context
+	config  *config.Config
 
 	Identity *identity.IdentityService
 	Session  *session.SessionService
