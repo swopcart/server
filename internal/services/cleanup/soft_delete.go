@@ -21,7 +21,7 @@ type modelInfo struct {
 func (svc *CleanupService) handleSoftDeleteCleanup(
 	ctx context.Context,
 	logger *slog.Logger,
-	params map[string]string,
+	params jobs.Params,
 	progress jobs.ProgressReporter,
 ) error {
 	// Parse parameters
@@ -170,7 +170,7 @@ func (svc *CleanupService) cleanupModel(
 	return totalDeleted, nil
 }
 
-func parseIntParam(params map[string]string, key string, defaultValue int) (int, error) {
+func parseIntParam(params jobs.Params, key string, defaultValue int) (int, error) {
 	value, exists := params[key]
 	if !exists {
 		return defaultValue, nil

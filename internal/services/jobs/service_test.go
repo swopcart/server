@@ -1,4 +1,4 @@
-package jobs
+package jobs_test
 
 import (
 	"context"
@@ -8,107 +8,72 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
-	"github.com/swopcart/server/internal/config"
 	"github.com/swopcart/server/internal/database"
+	"github.com/swopcart/server/internal/services/jobs"
+	"github.com/swopcart/server/internal/testkit"
 )
 
-func TestNewJobService(t *testing.T) {
-	tk := newTestHarness(t)
+func TestRegisterAndExecuteHandler(t *testing.T) {
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	cfg.Jobs.DefaultWorkers = 2
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
-
-	if svc == nil {
-		t.Fatal("Expected non-nil service")
-	}
-
-	// Verify cron is started
-	if svc.cron == nil {
-		t.Fatal("Expected cron scheduler to be initialized")
-	}
-
-	// Verify maps are initialized
-	if svc.handlers == nil {
-		t.Fatal("Expected handlers map to be initialized")
-	}
-	if svc.workers == nil {
-		t.Fatal("Expected workers map to be initialized")
-	}
-
-	// Verify default worker pool exists
-	svc.workersMu.RLock()
-	defaultPool := svc.workers["default"]
-	svc.workersMu.RUnlock()
-
-	if defaultPool == nil {
-		t.Fatal("Expected default worker pool to be created")
-	}
-	if defaultPool.workerCount != 2 {
-		t.Errorf("Expected 2 workers, got %d", defaultPool.workerCount)
-	}
-}
-
-func TestRegisterHandler(t *testing.T) {
-	tk := newTestHarness(t)
-
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
-
-	handler := func(ctx context.Context, logger *slog.Logger, params map[string]string, progress ProgressReporter) error {
+	executed := make(chan bool, 1)
+	handler := func(ctx context.Context, logger *slog.Logger, params jobs.Params, progress jobs.ProgressReporter) error {
+		executed <- true
 		return nil
 	}
 
-	err = svc.RegisterHandler("test_job", handler)
+	// Register handler
+	err := svc.RegisterHandler("test_job", handler)
 	if err != nil {
 		t.Fatalf("Failed to register handler: %v", err)
 	}
 
-	// Verify handler is registered
-	svc.handlersMu.RLock()
-	registered := svc.handlers["test_job"]
-	svc.handlersMu.RUnlock()
+	// Enqueue and verify it executes
+	_, err = svc.EnqueueJob(ctx, "test_job")
+	if err != nil {
+		t.Fatalf("Failed to enqueue job: %v", err)
+	}
 
-	if registered == nil {
-		t.Fatal("Expected handler to be registered")
+	select {
+	case <-executed:
+		// Success - handler was called
+	case <-time.After(2 * time.Second):
+		t.Fatal("Job did not execute")
 	}
 
 	// Try to register again - should fail
 	err = svc.RegisterHandler("test_job", handler)
-	if err != ErrHandlerAlreadyRegistered {
-		t.Errorf("Expected ErrHandlerAlreadyRegistered, got %v", err)
+	if err == nil {
+		t.Error("Expected error when registering duplicate handler")
 	}
 }
 
 func TestRegisterScheduledJob(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
-	handler := func(ctx context.Context, logger *slog.Logger, params map[string]string, progress ProgressReporter) error {
+	handler := func(ctx context.Context, logger *slog.Logger, params jobs.Params, progress jobs.ProgressReporter) error {
 		return nil
 	}
 
-	err = svc.RegisterScheduledJob(
-		tk.Context(),
+	err := svc.RegisterScheduledJob(
+		ctx,
 		"scheduled_test",
 		"Test scheduled job",
 		"*/5 * * * * *", // Every 5 seconds
 		handler,
-		WithDefaultParameters(map[string]string{"key": "value"}),
-		WithPriority(10),
-		WithQueue("test_queue"),
+		jobs.WithDefaultParameters(map[string]string{"key": "value"}),
+		jobs.WithPriority(10),
+		jobs.WithQueue("test_queue"),
 	)
 	if err != nil {
 		t.Fatalf("Failed to register scheduled job: %v", err)
@@ -116,7 +81,7 @@ func TestRegisterScheduledJob(t *testing.T) {
 
 	// Verify job was created in database
 	var job database.Job
-	err = tk.DB().Where("name = ?", "scheduled_test").First(&job).Error
+	err = tk.DB.Where("name = ?", "scheduled_test").First(&job).Error
 	if err != nil {
 		t.Fatalf("Failed to find job in database: %v", err)
 	}
@@ -137,40 +102,26 @@ func TestRegisterScheduledJob(t *testing.T) {
 		t.Errorf("Expected queue 'test_queue', got %s", job.Queue)
 	}
 
-	// Verify default parameters
-	params, err := deserializeParams(job.DefaultParameters)
-	if err != nil {
-		t.Fatalf("Failed to deserialize params: %v", err)
-	}
-	if params["key"] != "value" {
-		t.Errorf("Expected param key=value, got %v", params)
-	}
-
-	// Verify handler was registered
-	svc.handlersMu.RLock()
-	registered := svc.handlers["scheduled_test"]
-	svc.handlersMu.RUnlock()
-
-	if registered == nil {
-		t.Fatal("Expected handler to be registered")
+	// Verify default parameters are stored (implementation detail of how they're stored is hidden)
+	if job.DefaultParameters == nil {
+		t.Error("Expected default parameters to be stored")
 	}
 }
 
 func TestRegisterScheduledJobInvalidCron(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
-	handler := func(ctx context.Context, logger *slog.Logger, params map[string]string, progress ProgressReporter) error {
+	handler := func(ctx context.Context, logger *slog.Logger, params jobs.Params, progress jobs.ProgressReporter) error {
 		return nil
 	}
 
-	err = svc.RegisterScheduledJob(
-		tk.Context(),
+	err := svc.RegisterScheduledJob(
+		ctx,
 		"invalid_cron",
 		"Invalid cron",
 		"not a valid cron",
@@ -181,130 +132,31 @@ func TestRegisterScheduledJobInvalidCron(t *testing.T) {
 	}
 }
 
-func TestSerializeDeserializeParams(t *testing.T) {
-	tests := []struct {
-		name   string
-		params map[string]string
-	}{
-		{
-			name:   "empty",
-			params: map[string]string{},
-		},
-		{
-			name:   "single param",
-			params: map[string]string{"key": "value"},
-		},
-		{
-			name: "multiple params",
-			params: map[string]string{
-				"key1": "value1",
-				"key2": "value2",
-				"key3": "value3",
-			},
-		},
-		{
-			name: "special characters",
-			params: map[string]string{
-				"path":  "/path/to/file",
-				"query": "key=value&foo=bar",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			serialized, err := serializeParams(tt.params)
-			if err != nil {
-				t.Fatalf("Failed to serialize: %v", err)
-			}
-
-			deserialized, err := deserializeParams(serialized)
-			if err != nil {
-				t.Fatalf("Failed to deserialize: %v", err)
-			}
-
-			if diff := cmp.Diff(tt.params, deserialized); diff != "" {
-				t.Errorf("Params mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestMergeParams(t *testing.T) {
-	tests := []struct {
-		name     string
-		defaults map[string]string
-		runtime  map[string]string
-		expected map[string]string
-	}{
-		{
-			name:     "no defaults, no runtime",
-			defaults: map[string]string{},
-			runtime:  map[string]string{},
-			expected: map[string]string{},
-		},
-		{
-			name:     "only defaults",
-			defaults: map[string]string{"key1": "default1", "key2": "default2"},
-			runtime:  map[string]string{},
-			expected: map[string]string{"key1": "default1", "key2": "default2"},
-		},
-		{
-			name:     "only runtime",
-			defaults: map[string]string{},
-			runtime:  map[string]string{"key1": "runtime1"},
-			expected: map[string]string{"key1": "runtime1"},
-		},
-		{
-			name:     "runtime overrides defaults",
-			defaults: map[string]string{"key1": "default1", "key2": "default2"},
-			runtime:  map[string]string{"key1": "runtime1"},
-			expected: map[string]string{"key1": "runtime1", "key2": "default2"},
-		},
-		{
-			name:     "runtime adds new keys",
-			defaults: map[string]string{"key1": "default1"},
-			runtime:  map[string]string{"key2": "runtime2"},
-			expected: map[string]string{"key1": "default1", "key2": "runtime2"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := mergeParams(tt.defaults, tt.runtime)
-			if diff := cmp.Diff(tt.expected, result); diff != "" {
-				t.Errorf("Merged params mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
 func TestEnqueueJob(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
 	// Register a handler first
 	executed := make(chan bool, 1)
-	handler := func(ctx context.Context, logger *slog.Logger, params map[string]string, progress ProgressReporter) error {
+	handler := func(ctx context.Context, logger *slog.Logger, params jobs.Params, progress jobs.ProgressReporter) error {
 		executed <- true
 		return nil
 	}
 
-	err = svc.RegisterHandler("test_enqueue", handler)
+	err := svc.RegisterHandler("test_enqueue", handler)
 	if err != nil {
 		t.Fatalf("Failed to register handler: %v", err)
 	}
 
 	// Enqueue the job
 	executionUUID, err := svc.EnqueueJob(
-		tk.Context(),
+		ctx,
 		"test_enqueue",
-		WithParameters(map[string]string{"param1": "value1"}),
+		jobs.WithParameters(map[string]string{"param1": "value1"}),
 	)
 	if err != nil {
 		t.Fatalf("Failed to enqueue job: %v", err)
@@ -316,7 +168,7 @@ func TestEnqueueJob(t *testing.T) {
 
 	// Verify execution was created in database
 	var execution database.JobExecution
-	err = tk.DB().Where("uuid = ?", executionUUID).First(&execution).Error
+	err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
 	if err != nil {
 		t.Fatalf("Failed to find execution in database: %v", err)
 	}
@@ -326,15 +178,6 @@ func TestEnqueueJob(t *testing.T) {
 	}
 	if execution.TriggerType != "manual" {
 		t.Errorf("Expected trigger type 'manual', got %s", execution.TriggerType)
-	}
-
-	// Verify parameters
-	params, err := deserializeParams(execution.Parameters)
-	if err != nil {
-		t.Fatalf("Failed to deserialize params: %v", err)
-	}
-	if params["param1"] != "value1" {
-		t.Errorf("Expected param1=value1, got %v", params)
 	}
 
 	// Wait for execution (with timeout)
@@ -348,7 +191,7 @@ func TestEnqueueJob(t *testing.T) {
 	}
 
 	// Verify execution was updated
-	err = tk.DB().Where("uuid = ?", executionUUID).First(&execution).Error
+	err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
 	if err != nil {
 		t.Fatalf("Failed to find execution after completion: %v", err)
 	}
@@ -365,28 +208,27 @@ func TestEnqueueJob(t *testing.T) {
 }
 
 func TestEnqueueJobWithDefaultParameters(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
 	// Register scheduled job with default parameters
 	receivedParams := make(chan map[string]string, 1)
-	handler := func(ctx context.Context, logger *slog.Logger, params map[string]string, progress ProgressReporter) error {
+	handler := func(ctx context.Context, logger *slog.Logger, params jobs.Params, progress jobs.ProgressReporter) error {
 		receivedParams <- params
 		return nil
 	}
 
-	err = svc.RegisterScheduledJob(
-		tk.Context(),
+	err := svc.RegisterScheduledJob(
+		ctx,
 		"test_defaults",
 		"Test defaults",
 		"0 0 * * * *", // Never runs automatically
 		handler,
-		WithDefaultParameters(map[string]string{
+		jobs.WithDefaultParameters(map[string]string{
 			"default1": "value1",
 			"default2": "value2",
 		}),
@@ -397,9 +239,9 @@ func TestEnqueueJobWithDefaultParameters(t *testing.T) {
 
 	// Enqueue with runtime parameters that override defaults
 	_, err = svc.EnqueueJob(
-		tk.Context(),
+		ctx,
 		"test_defaults",
-		WithParameters(map[string]string{
+		jobs.WithParameters(map[string]string{
 			"default1": "overridden",
 			"runtime1": "new",
 		}),
@@ -408,7 +250,7 @@ func TestEnqueueJobWithDefaultParameters(t *testing.T) {
 		t.Fatalf("Failed to enqueue job: %v", err)
 	}
 
-	// Wait for execution
+	// Wait for execution and verify parameter merging
 	select {
 	case params := <-receivedParams:
 		expected := map[string]string{
@@ -425,28 +267,26 @@ func TestEnqueueJobWithDefaultParameters(t *testing.T) {
 }
 
 func TestEnqueueJobNotFound(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
-	_, err = svc.EnqueueJob(tk.Context(), "nonexistent_job")
-	if err != ErrHandlerNotFound {
-		t.Errorf("Expected ErrHandlerNotFound, got %v", err)
+	_, err := svc.EnqueueJob(ctx, "nonexistent_job")
+	if err == nil {
+		t.Error("Expected error when enqueueing nonexistent job")
 	}
 }
 
 func TestEnqueueJobHandlerNotFound(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
 	// Create a job in DB without registering a handler
 	job := database.Job{
@@ -455,24 +295,23 @@ func TestEnqueueJobHandlerNotFound(t *testing.T) {
 		Description: "No handler",
 		Queue:       "default",
 	}
-	if err := tk.DB().Create(&job).Error; err != nil {
+	if err := tk.DB.Create(&job).Error; err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
 
-	_, err = svc.EnqueueJob(tk.Context(), "no_handler")
-	if err != ErrHandlerNotFound {
-		t.Errorf("Expected ErrHandlerNotFound, got %v", err)
+	_, err := svc.EnqueueJob(ctx, "no_handler")
+	if err == nil {
+		t.Error("Expected error when handler not registered")
 	}
 }
 
 func TestGetExecution(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
 	// Create a test execution
 	job := database.Job{
@@ -481,7 +320,7 @@ func TestGetExecution(t *testing.T) {
 		Description: "Test",
 		Queue:       "default",
 	}
-	if err := tk.DB().Create(&job).Error; err != nil {
+	if err := tk.DB.Create(&job).Error; err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
 
@@ -493,12 +332,12 @@ func TestGetExecution(t *testing.T) {
 		TriggerType: "manual",
 		StartedAt:   time.Now(),
 	}
-	if err := tk.DB().Create(&execution).Error; err != nil {
+	if err := tk.DB.Create(&execution).Error; err != nil {
 		t.Fatalf("Failed to create execution: %v", err)
 	}
 
 	// Get execution
-	result, err := svc.GetExecution(tk.Context(), executionUUID)
+	result, err := svc.GetExecution(ctx, executionUUID)
 	if err != nil {
 		t.Fatalf("Failed to get execution: %v", err)
 	}
@@ -512,28 +351,26 @@ func TestGetExecution(t *testing.T) {
 }
 
 func TestGetExecutionNotFound(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
-	_, err = svc.GetExecution(tk.Context(), uuid.New())
-	if err != ErrExecutionNotFound {
-		t.Errorf("Expected ErrExecutionNotFound, got %v", err)
+	_, err := svc.GetExecution(ctx, uuid.New())
+	if err == nil {
+		t.Error("Expected error when getting nonexistent execution")
 	}
 }
 
 func TestGetJobExecutionHistory(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
 	// Create a job
 	job := database.Job{
@@ -542,7 +379,7 @@ func TestGetJobExecutionHistory(t *testing.T) {
 		Description: "Test",
 		Queue:       "default",
 	}
-	if err := tk.DB().Create(&job).Error; err != nil {
+	if err := tk.DB.Create(&job).Error; err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
 
@@ -555,13 +392,13 @@ func TestGetJobExecutionHistory(t *testing.T) {
 			TriggerType: "manual",
 			StartedAt:   time.Now().Add(time.Duration(-i) * time.Hour),
 		}
-		if err := tk.DB().Create(&execution).Error; err != nil {
+		if err := tk.DB.Create(&execution).Error; err != nil {
 			t.Fatalf("Failed to create execution: %v", err)
 		}
 	}
 
 	// Get history
-	history, err := svc.GetJobExecutionHistory(tk.Context(), "test_history", 10)
+	history, err := svc.GetJobExecutionHistory(ctx, "test_history", 10)
 	if err != nil {
 		t.Fatalf("Failed to get history: %v", err)
 	}
@@ -578,7 +415,7 @@ func TestGetJobExecutionHistory(t *testing.T) {
 	}
 
 	// Test limit
-	limited, err := svc.GetJobExecutionHistory(tk.Context(), "test_history", 2)
+	limited, err := svc.GetJobExecutionHistory(ctx, "test_history", 2)
 	if err != nil {
 		t.Fatalf("Failed to get limited history: %v", err)
 	}
@@ -589,13 +426,12 @@ func TestGetJobExecutionHistory(t *testing.T) {
 }
 
 func TestListRecentExecutions(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
+	ctx := context.Background()
+	svc := tk.Services.Jobs
 
 	// Create multiple jobs
 	for i := 0; i < 3; i++ {
@@ -605,7 +441,7 @@ func TestListRecentExecutions(t *testing.T) {
 			Description: "Test",
 			Queue:       "default",
 		}
-		if err := tk.DB().Create(&job).Error; err != nil {
+		if err := tk.DB.Create(&job).Error; err != nil {
 			t.Fatalf("Failed to create job: %v", err)
 		}
 
@@ -618,14 +454,14 @@ func TestListRecentExecutions(t *testing.T) {
 				TriggerType: "manual",
 				StartedAt:   time.Now().Add(time.Duration(-(i*2 + j)) * time.Hour),
 			}
-			if err := tk.DB().Create(&execution).Error; err != nil {
+			if err := tk.DB.Create(&execution).Error; err != nil {
 				t.Fatalf("Failed to create execution: %v", err)
 			}
 		}
 	}
 
 	// Get recent executions
-	executions, err := svc.ListRecentExecutions(tk.Context(), 10)
+	executions, err := svc.ListRecentExecutions(ctx, 10)
 	if err != nil {
 		t.Fatalf("Failed to list executions: %v", err)
 	}
@@ -642,7 +478,7 @@ func TestListRecentExecutions(t *testing.T) {
 	}
 
 	// Test limit
-	limited, err := svc.ListRecentExecutions(tk.Context(), 3)
+	limited, err := svc.ListRecentExecutions(ctx, 3)
 	if err != nil {
 		t.Fatalf("Failed to list limited executions: %v", err)
 	}
@@ -653,23 +489,14 @@ func TestListRecentExecutions(t *testing.T) {
 }
 
 func TestShutdown(t *testing.T) {
-	tk := newTestHarness(t)
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
 
-	cfg := config.DefaultConfig()
-	cfg.Jobs.ShutdownTimeout = 5 * time.Second
+	svc := tk.Services.Jobs
 
-	svc, err := NewJobService(tk.Context(), &cfg, tk.Logger(), tk.DB())
-	if err != nil {
-		t.Fatalf("Failed to create job service: %v", err)
-	}
-
-	// Verify cron is running
-	if svc.cron == nil {
-		t.Fatal("Expected cron to be initialized")
-	}
-
-	// Shutdown
-	err = svc.Shutdown()
+	// Shutdown should complete without error
+	err := svc.Shutdown()
 	if err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
 	}

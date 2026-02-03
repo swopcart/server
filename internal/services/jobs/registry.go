@@ -30,7 +30,7 @@ func WithEnabled(enabled bool) JobOption {
 }
 
 // WithDefaultParameters sets default parameters for the job
-func WithDefaultParameters(params map[string]string) JobOption {
+func WithDefaultParameters(params Params) JobOption {
 	return func(j *database.Job) {
 		serialized, _ := serializeParams(params)
 		j.DefaultParameters = serialized
@@ -42,7 +42,7 @@ type EnqueueOption func(*enqueueConfig)
 
 type enqueueConfig struct {
 	queue      string
-	parameters map[string]string
+	parameters Params
 }
 
 // WithQueueOverride overrides the default queue for this execution
@@ -51,7 +51,7 @@ func WithQueueOverride(queue string) EnqueueOption {
 }
 
 // WithParameters sets runtime parameters for this execution
-func WithParameters(params map[string]string) EnqueueOption {
+func WithParameters(params Params) EnqueueOption {
 	return func(cfg *enqueueConfig) { cfg.parameters = params }
 }
 
@@ -140,7 +140,7 @@ func (svc *JobService) EnqueueJob(
 ) (uuid.UUID, error) {
 	// Parse options
 	cfg := &enqueueConfig{
-		parameters: make(map[string]string),
+		parameters: make(Params),
 	}
 	for _, opt := range opts {
 		opt(cfg)
