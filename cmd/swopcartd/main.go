@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -43,6 +44,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Register jobs from all services
+	if err := registerJobs(svc); err != nil {
+		slog.Error("Failed to register jobs", "err", err)
+		os.Exit(1)
+	}
+
 	server, err := www.NewServer(&config, slog.Default(), ctx, svc)
 	if err != nil {
 		slog.Error("can't create web server", "err", err)
@@ -56,7 +63,23 @@ func main() {
 
 	waitForExitSignal()
 	slog.Info("exiting")
+
+	// Shutdown jobs first (prevent new jobs from being queued)
+	if err := svc.Jobs.Shutdown(); err != nil {
+		slog.Error("Error shutting down job service", "err", err)
+	}
+
 	_ = server.Shutdown()
+}
+
+// registerJobs calls RegisterJobs on each service that implements it
+func registerJobs(svc *services.Services) error {
+	// Register cleanup jobs
+	if err := svc.Cleanup.RegisterJobs(svc.Jobs); err != nil {
+		return fmt.Errorf("failed to register cleanup jobs: %w", err)
+	}
+
+	return nil
 }
 
 func loadConfig() (config.Config, error) {

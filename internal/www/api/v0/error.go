@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swopcart/server/internal/services/identity"
+	"github.com/swopcart/server/internal/services/jobs"
 	"github.com/swopcart/server/internal/services/session"
 )
 
@@ -64,6 +65,14 @@ const (
 	ErrCodeSessionEnded    = "SessionEnded"
 )
 
+// Error codes - Job management
+const (
+	ErrCodeJobNotFound       = "JobNotFound"
+	ErrCodeExecutionNotFound = "ExecutionNotFound"
+	ErrCodeInvalidSchedule   = "InvalidSchedule"
+	ErrCodeHandlerNotFound   = "HandlerNotFound"
+)
+
 // respondError sends a single error response
 func respondError(c *gin.Context, status int, code, message string) {
 	c.JSON(status, ErrorResponse{
@@ -114,6 +123,13 @@ var sessionErrorMap = map[error]errorMapping{
 	session.ErrInvalidToken: {ErrCodeInvalidToken, "Invalid token", ""},
 }
 
+var jobsErrorMap = map[error]errorMapping{
+	jobs.ErrJobNotFound:       {ErrCodeJobNotFound, "Job not found", ""},
+	jobs.ErrExecutionNotFound: {ErrCodeExecutionNotFound, "Execution not found", ""},
+	jobs.ErrInvalidSchedule:   {ErrCodeInvalidSchedule, "Invalid cron schedule", ".schedule"},
+	jobs.ErrHandlerNotFound:   {ErrCodeHandlerNotFound, "Job handler not registered", ""},
+}
+
 // mapIdentityError maps service layer errors to API error codes.
 // Returns (code, message, key) where key is the field path (e.g., ".username", ".password")
 func mapIdentityError(err error) (code, message, key string) {
@@ -133,6 +149,16 @@ func mapSessionError(err error) (code, message string) {
 		}
 	}
 	return "", ""
+}
+
+// mapJobsError maps jobs service errors to API error codes
+func mapJobsError(err error) errorMapping {
+	for target, mapping := range jobsErrorMap {
+		if errors.Is(err, target) {
+			return mapping
+		}
+	}
+	return errorMapping{}
 }
 
 // respondWithIdentityError handles service layer identity errors

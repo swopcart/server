@@ -39,5 +39,7 @@ func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&User{},
 		&Session{},
+		&Job{},
+		&JobExecution{},
 	)
 }
