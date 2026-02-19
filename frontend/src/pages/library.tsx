@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Container } from "@/components/container";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,12 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { listLibraries } from "@/lib/api/libraries";
 import { listGamesByLibrary } from "@/lib/api/games";
-import type { Game, GameListResponse } from "@/lib/api/types";
+import type { GameListResponse } from "@/lib/api/types";
 import { useAsync } from "@/hooks/use-async";
 import { LucideChevronLeft, LucideChevronRight } from "lucide-react";
-import { GameDetailsModal } from "./library/game-details-modal";
 
 export function LibraryPage() {
+  const navigate = useNavigate();
   const { data: libraries, loading: loadingLibraries } = useAsync(
     listLibraries,
     [],
@@ -29,7 +30,6 @@ export function LibraryPage() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
-  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
 
   const pageSize = 50;
 
@@ -150,7 +150,7 @@ export function LibraryPage() {
                       {gamesData.items.map((game) => (
                         <button
                           key={game.id}
-                          onClick={() => setSelectedGame(game)}
+                          onClick={() => navigate(`/game/${game.id}`)}
                           className="border rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-gray-800 transition text-left"
                         >
                           <h3 className="font-semibold truncate">
@@ -208,15 +208,6 @@ export function LibraryPage() {
           </>
         )}
       </div>
-
-      {selectedGame && (
-        <GameDetailsModal
-          game={selectedGame}
-          onOpenChange={(open) => {
-            if (!open) setSelectedGame(null);
-          }}
-        />
-      )}
     </Container>
   );
 }

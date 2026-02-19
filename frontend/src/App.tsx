@@ -4,6 +4,7 @@ import { ThemeProvider } from "./components/theme-provider";
 import { LoginPage } from "./pages/login";
 import { HomePage } from "./pages/home";
 import { LibraryPage } from "./pages/library";
+import { GameDetailsPage } from "./pages/game-details";
 import { MyGamesPage } from "./pages/my-games";
 import { SettingsPage } from "./pages/settings";
 import { AccountPage } from "./pages/account";
@@ -24,6 +25,7 @@ function AuthenticatedLayout() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/game/:gameId" element={<GameDetailsPage />} />
           <Route path="/my-games" element={<MyGamesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/users" element={<ManageUsersPage />} />
