@@ -71,13 +71,13 @@ export function GameDetailsModal({
     }
   };
 
-  const handleDownload = async (versionId: string, fileName?: string) => {
+  const handleDownload = async (versionId: string) => {
     try {
-      const blob = await downloadGameVersion(game!.id, versionId);
+      const { blob, filename } = await downloadGameVersion(game!.id, versionId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileName || `${game!.title}.rom`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -271,12 +271,7 @@ export function GameDetailsModal({
                       </div>
                       <Button
                         size="sm"
-                        onClick={() =>
-                          handleDownload(
-                            version.id,
-                            `${displayGame.title}-${version.versionName}`,
-                          )
-                        }
+                        onClick={() => handleDownload(version.id)}
                         className="flex gap-1 items-center mt-2"
                       >
                         <LucideDownload className="w-4 h-4" /> Download

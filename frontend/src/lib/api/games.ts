@@ -109,12 +109,12 @@ export async function updateGameMetadata(
 
 /**
  * Download a specific game version
- * Returns a blob that can be used to create a download link
+ * Returns a blob and filename extracted from Content-Disposition header
  */
 export async function downloadGameVersion(
   gameId: string,
   versionId: string,
-): Promise<Blob> {
+): Promise<{ blob: Blob; filename: string }> {
   const response = await fetchWithAuth(
     `/games/${gameId}/versions/${versionId}/download`,
     {
@@ -127,5 +127,16 @@ export async function downloadGameVersion(
     throw new ApiError(response.status, body);
   }
 
-  return response.blob();
+  // Extract filename from Content-Disposition header
+  let filename = "download";
+  const contentDisposition = response.headers.get("content-disposition");
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?([^";\n]+)"?/);
+    if (filenameMatch && filenameMatch[1]) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  const blob = await response.blob();
+  return { blob, filename };
 }
