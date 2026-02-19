@@ -73,6 +73,24 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 		jobs.GET("/:job_name/history", h.jobsGetHistory)
 		jobs.POST("/:job_name/trigger", h.jobsTrigger)
 	}
+
+	libraries := r.Group("/libraries", h.authMiddleware())
+	{
+		libraries.GET("/", h.ListLibrariesHandler)
+		libraries.POST("/", h.CreateLibraryHandler)
+		libraries.GET("/:libraryId", h.GetLibraryHandler)
+		libraries.PATCH("/:libraryId", h.UpdateLibraryHandler)
+		libraries.DELETE("/:libraryId", h.DeleteLibraryHandler)
+		libraries.POST("/:libraryId/scan", h.TriggerLibraryScanHandler)
+	}
+
+	games := r.Group("/games", h.authMiddleware())
+	{
+		games.GET("/by-library/:libraryId", h.ListGamesHandler)
+		games.GET("/:gameId", h.GetGameHandler)
+		games.GET("/:gameId/versions/:versionId/download", h.DownloadGameVersionHandler)
+		games.PATCH("/:gameId", h.UpdateGameMetadataHandler)
+	}
 }
 
 func (h *APIHandlers) getPing(c *gin.Context) {
