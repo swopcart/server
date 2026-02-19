@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,7 @@ type GameListResponse struct {
 // ListGamesHandler returns games in a library with pagination
 func (h *APIHandlers) ListGamesHandler(c *gin.Context) {
 	libraryID := c.Param("libraryId")
-	_, err := uuid.Parse(libraryID)
+	id, err := uuid.Parse(libraryID)
 	if err != nil {
 		respondFieldError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid library ID", ".libraryId")
 		return
@@ -40,6 +41,7 @@ func (h *APIHandlers) ListGamesHandler(c *gin.Context) {
 
 	// Get pagination parameters
 	offset := 0
+	limit := 50
 	if offsetStr := c.Query("offset"); offsetStr != "" {
 		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
 			offset = o
@@ -47,33 +49,48 @@ func (h *APIHandlers) ListGamesHandler(c *gin.Context) {
 	}
 	if limitStr := c.Query("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
-			_ = l // Limit parsed but not yet used
+			limit = l
 		}
 	}
 
-	// Get search query (parsed but not yet used)
-	_ = c.Query("search")
+	// Get search query
+	search := c.Query("search")
 
-	// TODO: Implement game listing with search and pagination
-	// For now, return empty list
+	games, total, err := h.services.Library.GetGamesByLibrary(c.Request.Context(), id, offset, limit, search)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "failed to list games", "libraryId", id, "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
 	c.JSON(http.StatusOK, GameListResponse{
-		Items:  []interface{}{},
+		Items:  games,
 		Offset: offset,
-		Total:  0,
+		Total:  total,
 	})
 }
 
 // GetGameHandler returns a single game with all versions and metadata
 func (h *APIHandlers) GetGameHandler(c *gin.Context) {
 	gameID := c.Param("gameId")
-	_, err := uuid.Parse(gameID)
+	id, err := uuid.Parse(gameID)
 	if err != nil {
 		respondFieldError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid game ID", ".gameId")
 		return
 	}
 
-	// TODO: Implement game fetching with versions
-	respondError(c, http.StatusNotImplemented, "NotImplemented", "Game fetching not yet implemented")
+	game, err := h.services.Library.GetGameByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, errors.New("game not found")) {
+			respondError(c, http.StatusNotFound, ErrCodeGameNotFound, "Game not found")
+		} else {
+			h.logger.ErrorContext(c.Request.Context(), "failed to get game", "id", id, "error", err)
+			c.Status(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, game)
 }
 
 // DownloadGameVersionHandler streams a game file for download
@@ -81,18 +98,36 @@ func (h *APIHandlers) DownloadGameVersionHandler(c *gin.Context) {
 	gameID := c.Param("gameId")
 	versionID := c.Param("versionId")
 
-	if _, err := uuid.Parse(gameID); err != nil {
+	gameUUID, err := uuid.Parse(gameID)
+	if err != nil {
 		respondFieldError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid game ID", ".gameId")
 		return
 	}
 
-	if _, err := uuid.Parse(versionID); err != nil {
+	versionUUID, err := uuid.Parse(versionID)
+	if err != nil {
 		respondFieldError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid version ID", ".versionId")
 		return
 	}
 
-	// TODO: Implement game file download with streaming and range request support
-	respondError(c, http.StatusNotImplemented, "NotImplemented", "Game download not yet implemented")
+	// Get the game version
+	version, err := h.services.Library.GetGameVersionByID(c.Request.Context(), gameUUID, versionUUID)
+	if err != nil {
+		if errors.Is(err, errors.New("version not found")) {
+			respondError(c, http.StatusNotFound, ErrCodeVersionNotFound, "Game version not found")
+		} else {
+			h.logger.ErrorContext(c.Request.Context(), "failed to get game version", "gameId", gameUUID, "versionId", versionUUID, "error", err)
+			c.Status(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Stream the file
+	filename := filepath.Base(version.FilePath)
+	if err := h.downloadGameFile(c, version.FilePath, filename); err != nil {
+		// Error already handled in downloadGameFile
+		return
+	}
 }
 
 // UpdateGameMetadataHandler updates game metadata (admin-only)
