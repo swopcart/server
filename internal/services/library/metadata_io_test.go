@@ -310,3 +310,60 @@ func TestExtractMetadataFromFilename_Demo(t *testing.T) {
 		t.Errorf("Expected clean title 'Game Title', got %q", metadata.Title)
 	}
 }
+
+func TestExtractMetadataFromFilename_NTSCVariants(t *testing.T) {
+	tk := testkit.New(t)
+
+	librarySvc, err := library.NewLibraryService(tk.T.Context(), tk.Config, tk.Logger, tk.DB)
+	if err != nil {
+		t.Fatalf("Failed to create library service: %v", err)
+	}
+
+	// Test .ntsc-u (NTSC USA variant)
+	filename := "Super Mario World.ntsc-u.sfc"
+	metadata := librarySvc.ExtractMetadataFromFilename(filename, "SNES")
+
+	if metadata.Title != "Super Mario World" {
+		t.Errorf("Expected clean title 'Super Mario World', got %q", metadata.Title)
+	}
+
+	if len(metadata.Regions) == 0 {
+		t.Errorf("Expected regions for .ntsc-u, got empty")
+	}
+
+	hasNTSC := false
+	hasUSA := false
+	for _, region := range metadata.Regions {
+		if region == "NTSC" {
+			hasNTSC = true
+		}
+		if region == "USA" {
+			hasUSA = true
+		}
+	}
+
+	if !hasNTSC || !hasUSA {
+		t.Errorf("Expected NTSC and USA regions for .ntsc-u, got %v", metadata.Regions)
+	}
+}
+
+func TestExtractMetadataFromFilename_PALRegion(t *testing.T) {
+	tk := testkit.New(t)
+
+	librarySvc, err := library.NewLibraryService(tk.T.Context(), tk.Config, tk.Logger, tk.DB)
+	if err != nil {
+		t.Fatalf("Failed to create library service: %v", err)
+	}
+
+	// Test .pal (PAL variant)
+	filename := "Super Mario World.pal.smc"
+	metadata := librarySvc.ExtractMetadataFromFilename(filename, "SNES")
+
+	if metadata.Title != "Super Mario World" {
+		t.Errorf("Expected clean title 'Super Mario World', got %q", metadata.Title)
+	}
+
+	if len(metadata.Regions) == 0 || metadata.Regions[0] != "PAL" {
+		t.Errorf("Expected PAL region, got %v", metadata.Regions)
+	}
+}

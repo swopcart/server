@@ -190,13 +190,36 @@ func (svc *LibraryService) ExtractMetadataFromFilename(filename string, platform
 		}
 	}
 
-	// Extract region: .pal, .ntsc
+	// Extract region: .pal, .ntsc, .ntsc-u, .ntsc-j, etc.
+	// Handle hyphenated variants first (.ntsc-u, .ntsc-j) before single (.ntsc)
+	if strings.Contains(title, ".ntsc-u") {
+		if !contains(metadata.Regions, "NTSC") {
+			metadata.Regions = append(metadata.Regions, "NTSC")
+		}
+		if !contains(metadata.Regions, "USA") {
+			metadata.Regions = append(metadata.Regions, "USA")
+		}
+		title = strings.ReplaceAll(title, ".ntsc-u", "")
+	}
+	if strings.Contains(title, ".ntsc-j") {
+		if !contains(metadata.Regions, "NTSC") {
+			metadata.Regions = append(metadata.Regions, "NTSC")
+		}
+		if !contains(metadata.Regions, "JPN") {
+			metadata.Regions = append(metadata.Regions, "JPN")
+		}
+		title = strings.ReplaceAll(title, ".ntsc-j", "")
+	}
 	if strings.Contains(title, ".pal") {
-		metadata.Regions = append(metadata.Regions, "PAL")
+		if !contains(metadata.Regions, "PAL") {
+			metadata.Regions = append(metadata.Regions, "PAL")
+		}
 		title = strings.ReplaceAll(title, ".pal", "")
 	}
 	if strings.Contains(title, ".ntsc") {
-		metadata.Regions = append(metadata.Regions, "NTSC")
+		if !contains(metadata.Regions, "NTSC") {
+			metadata.Regions = append(metadata.Regions, "NTSC")
+		}
 		title = strings.ReplaceAll(title, ".ntsc", "")
 	}
 

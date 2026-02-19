@@ -377,7 +377,8 @@ func (svc *LibraryService) UpsertGameVersion(ctx context.Context, gameID uuid.UU
 		First(&version)
 
 	if result.Error == nil {
-		// Version exists, update it
+		// Version exists, update it (including reassigning to new game if needed)
+		version.GameID = gameID
 		version.VersionName = versionName
 		version.FileSize = fileSize
 		if hash, ok := hashes["md5"]; ok {
