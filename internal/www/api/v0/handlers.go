@@ -74,6 +74,11 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 		jobs.POST("/:job_name/trigger", h.jobsTrigger)
 	}
 
+	platforms := r.Group("/platforms", h.authMiddleware())
+	{
+		platforms.GET("/", h.ListPlatformsHandler)
+	}
+
 	libraries := r.Group("/libraries", h.authMiddleware())
 	{
 		libraries.GET("/", h.ListLibrariesHandler)

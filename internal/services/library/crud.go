@@ -465,3 +465,39 @@ func (svc *LibraryService) UpdateGameMetadata(ctx context.Context, gameID uuid.U
 	svc.logger.DebugContext(ctx, "Game metadata updated", "id", game.ID)
 	return &game, nil
 }
+
+// PlatformResponse is the response for platform queries
+type PlatformResponse struct {
+	ID          uint     `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Extensions  []string `json:"extensions"`
+}
+
+// ListPlatforms returns all available platforms
+func (svc *LibraryService) ListPlatforms(ctx context.Context) ([]PlatformResponse, error) {
+	var platforms []database.Platform
+	if err := svc.db.WithContext(ctx).Find(&platforms).Error; err != nil {
+		return nil, err
+	}
+
+	responses := make([]PlatformResponse, len(platforms))
+	for i, p := range platforms {
+		var extensions []string
+		if p.Extensions != nil {
+			if err := json.Unmarshal([]byte(*p.Extensions), &extensions); err != nil {
+				svc.logger.WarnContext(ctx, "failed to parse extensions", "id", p.ID, "error", err)
+				extensions = []string{}
+			}
+		}
+
+		responses[i] = PlatformResponse{
+			ID:          p.ID,
+			Name:        p.Name,
+			Description: p.Description,
+			Extensions:  extensions,
+		}
+	}
+
+	return responses, nil
+}

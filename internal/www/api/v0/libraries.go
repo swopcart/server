@@ -131,7 +131,15 @@ func (h *APIHandlers) CreateLibraryHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, lib)
+	// Get the full library response with platform info
+	fullLib, err := h.services.Library.GetLibrary(c.Request.Context(), lib.ID)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "failed to get created library", "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusCreated, fullLib)
 }
 
 // UpdateLibraryHandler updates a library
@@ -175,7 +183,7 @@ func (h *APIHandlers) UpdateLibraryHandler(c *gin.Context) {
 		}
 	}
 
-	lib, err := h.services.Library.UpdateLibrary(c.Request.Context(), id, library.UpdateLibraryRequest{
+	_, err = h.services.Library.UpdateLibrary(c.Request.Context(), id, library.UpdateLibraryRequest{
 		Name:        req.Name,
 		Description: req.Description,
 		Paths:       req.Paths,
@@ -191,7 +199,15 @@ func (h *APIHandlers) UpdateLibraryHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, lib)
+	// Get the full library response with platform info
+	fullLib, err := h.services.Library.GetLibrary(c.Request.Context(), id)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "failed to get updated library", "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, fullLib)
 }
 
 // DeleteLibraryHandler deletes a library

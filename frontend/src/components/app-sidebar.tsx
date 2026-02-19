@@ -119,6 +119,19 @@ export function AppSidebar() {
                   <SettingsIcon />
                   Settings
                 </DropdownMenuItem>
+                {user?.admin && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        navigate("/settings/libraries");
+                        setOpenMobile(false);
+                      }}
+                    >
+                      <LibraryIcon />
+                      Manage Libraries
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>

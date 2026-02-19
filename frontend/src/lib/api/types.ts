@@ -55,3 +55,94 @@ export const ErrorResponseSchema = z.object({
 });
 
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+
+// Platform schemas
+export const PlatformSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  extensions: z.array(z.string()),
+});
+
+export type Platform = z.infer<typeof PlatformSchema>;
+
+// Game metadata schemas
+export const ExternalIdsSchema = z.record(z.string());
+
+export const GameMetadataSchema = z.object({
+  title: z.string(),
+  platform: z.string().optional(),
+  developer: z.string().optional(),
+  publisher: z.string().optional(),
+  releaseDate: z.string().optional(),
+  description: z.string().optional(),
+  externalIds: ExternalIdsSchema.optional(),
+  regions: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export type GameMetadata = z.infer<typeof GameMetadataSchema>;
+
+// Game version schemas
+export const GameVersionSchema = z.object({
+  id: z.string(),
+  versionName: z.string(),
+  filePath: z.string(),
+  fileSize: z.number(),
+  md5: z.string().optional(),
+  sha1: z.string().optional(),
+  sha256: z.string().optional(),
+  blake3: z.string().optional(),
+  metadataPath: z.string().optional(),
+  metadataJson: GameMetadataSchema.optional(),
+});
+
+export type GameVersion = z.infer<typeof GameVersionSchema>;
+
+// Game schemas
+export const GameSchema = z.object({
+  id: z.string(),
+  libraryId: z.string(),
+  title: z.string(),
+  platformId: z.number(),
+  developer: z.string().optional(),
+  publisher: z.string().optional(),
+  releasedDate: z.string().nullable().optional(),
+  description: z.string().optional(),
+  versions: z.array(GameVersionSchema).optional(),
+});
+
+export type Game = z.infer<typeof GameSchema>;
+
+// Library schemas
+export const LibrarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  platformId: z.number(),
+  platformName: z.string().optional(),
+  paths: z.array(z.string()),
+  lastScannedAt: z.string().nullable().optional(),
+  scanStatus: z.string(), // "idle", "scanning", "error"
+  lastScanError: z.string().nullable().optional(),
+  currentScanJobId: z.string().nullable().optional(),
+  gameCount: z.number().optional(),
+});
+
+export type Library = z.infer<typeof LibrarySchema>;
+
+// List response schemas
+export const LibraryListResponseSchema = z.object({
+  items: z.array(LibrarySchema),
+  total: z.number(),
+});
+
+export type LibraryListResponse = z.infer<typeof LibraryListResponseSchema>;
+
+export const GameListResponseSchema = z.object({
+  items: z.array(GameSchema),
+  offset: z.number(),
+  total: z.number(),
+});
+
+export type GameListResponse = z.infer<typeof GameListResponseSchema>;
