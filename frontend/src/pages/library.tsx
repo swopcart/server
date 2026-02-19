@@ -13,7 +13,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { listLibraries } from "@/lib/api/libraries";
 import { listGamesByLibrary } from "@/lib/api/games";
-import type { Game } from "@/lib/api/libraries";
+import type { Game, GameListResponse } from "@/lib/api/types";
 import { useAsync } from "@/hooks/use-async";
 import { LucideChevronLeft, LucideChevronRight } from "lucide-react";
 import { GameDetailsModal } from "./library/game-details-modal";
@@ -37,18 +37,21 @@ export function LibraryPage() {
     (lib) => lib.id === selectedLibraryId,
   );
 
-  const [{ data: gamesData, loading: loadingGames }] = useAsync(
-    selectedLibraryId
-      ? () =>
-          listGamesByLibrary(
-            selectedLibraryId,
-            currentPage * pageSize,
-            pageSize,
-            searchQuery || undefined,
-          )
-      : null,
-    [selectedLibraryId, currentPage, searchQuery],
-  );
+  const { data: gamesData, loading: loadingGames } = useAsync(async () => {
+    if (!selectedLibraryId) {
+      return null;
+    }
+    return listGamesByLibrary(
+      selectedLibraryId,
+      currentPage * pageSize,
+      pageSize,
+      searchQuery || undefined,
+    );
+  }, [selectedLibraryId, currentPage, searchQuery]) as {
+    data: GameListResponse | null;
+    loading: boolean;
+    error: Error | null;
+  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
