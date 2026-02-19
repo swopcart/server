@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   getGame,
   updateGameMetadata,
+  downloadGameVersion,
   type Game,
   type UpdateGameMetadataRequest,
 } from "@/lib/api/games";
@@ -70,16 +71,21 @@ export function GameDetailsModal({
     }
   };
 
-  const handleDownload = (versionId: string, fileName?: string) => {
-    // Note: Full download implementation would use the downloadGameVersion API
-    // For now, we'll provide a link that the user can click
-    const link = `/api/v0/games/${game!.id}/versions/${versionId}/download`;
-    const a = document.createElement("a");
-    a.href = link;
-    a.download = fileName || `${game!.title}.rom`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownload = async (versionId: string, fileName?: string) => {
+    try {
+      const blob = await downloadGameVersion(game!.id, versionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || `${game!.title}.rom`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Failed to download file. Please try again.");
+    }
   };
 
   const displayGame = game || initialGame;
