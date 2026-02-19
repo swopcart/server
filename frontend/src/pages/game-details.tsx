@@ -3,10 +3,17 @@ import { Container } from "@/components/container";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { MockOverlay } from "@/components/mock-overlay";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getGame, downloadGameVersion } from "@/lib/api/games";
 import { useAsync } from "@/hooks/use-async";
 import {
   LucideChevronLeft,
+  LucideChevronDown,
   LucideDownload,
   LucidePlay,
   LucideUsers,
@@ -25,6 +32,29 @@ export function GameDetailsPage() {
     () => (gameId ? getGame(gameId) : Promise.reject(new Error("No game ID"))),
     [gameId],
   );
+
+  const handleVersionDownload = async (
+    id: string,
+    version: Record<string, unknown>,
+  ) => {
+    try {
+      const { blob, filename } = await downloadGameVersion(
+        id,
+        version.id as string,
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Failed to download file. Please try again.");
+    }
+  };
 
   if (loading) {
     return (
@@ -125,33 +155,65 @@ export function GameDetailsPage() {
               {/* Versions Section */}
               {game.versions && game.versions.length > 0 && (
                 <div>
-                  <h2 className="text-2xl font-semibold mb-4">
-                    Available Versions
-                  </h2>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-semibold">
+                      Available Versions
+                    </h2>
+                    {game.versions.length === 1 ? (
+                      <VersionDownloadButton
+                        gameId={game.id}
+                        version={game.versions[0]}
+                      />
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button className="flex gap-2 items-center">
+                            <LucideDownload className="w-4 h-4" />
+                            Download <LucideChevronDown className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          {game.versions.map((version) => (
+                            <DropdownMenuItem
+                              key={version.id}
+                              onClick={() =>
+                                handleVersionDownload(game.id, version)
+                              }
+                            >
+                              <div className="flex flex-col gap-1 w-full">
+                                <span className="font-medium">
+                                  {version.versionName}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {(version.fileSize / 1024 / 1024).toFixed(2)}{" "}
+                                  MB
+                                </span>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+
                   <div className="space-y-3">
                     {game.versions.map((version) => (
                       <div
                         key={version.id}
                         className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition"
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="font-semibold">
-                              {version.versionName}
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                              {(version.fileSize / 1024 / 1024).toFixed(2)} MB
+                        <div>
+                          <h3 className="font-semibold">
+                            {version.versionName}
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            {(version.fileSize / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          {version.md5 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-mono break-all">
+                              MD5: {version.md5}
                             </p>
-                            {version.md5 && (
-                              <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-mono break-all">
-                                MD5: {version.md5}
-                              </p>
-                            )}
-                          </div>
-                          <VersionDownloadButton
-                            gameId={game.id}
-                            version={version}
-                          />
+                          )}
                         </div>
                       </div>
                     ))}
@@ -266,7 +328,10 @@ function VersionDownloadButton({
 }: VersionDownloadButtonProps) {
   const handleDownload = async () => {
     try {
-      const { blob, filename } = await downloadGameVersion(gameId, version.id);
+      const { blob, filename } = await downloadGameVersion(
+        gameId,
+        version.id as string,
+      );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
