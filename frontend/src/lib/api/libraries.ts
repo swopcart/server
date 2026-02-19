@@ -33,7 +33,7 @@ export type UpdateLibraryRequest = z.infer<typeof UpdateLibraryRequestSchema>;
 
 // Scan response
 export const TriggerScanResponseSchema = z.object({
-  executionUuid: z.string(),
+  executionId: z.string(),
   status: z.string(),
 });
 

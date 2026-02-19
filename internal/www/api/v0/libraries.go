@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/swopcart/server/internal/services/jobs"
 	"github.com/swopcart/server/internal/services/library"
 )
 
@@ -266,7 +267,11 @@ func (h *APIHandlers) TriggerLibraryScanHandler(c *gin.Context) {
 	}
 
 	// Enqueue scan job with parameters
-	executionID, err := h.services.Jobs.EnqueueJob(c.Request.Context(), "library.scan")
+	executionID, err := h.services.Jobs.EnqueueJob(
+		c.Request.Context(),
+		"library.scan",
+		jobs.WithParameters(jobs.Params{"libraries": id.String()}),
+	)
 
 	if err != nil {
 		h.logger.ErrorContext(c.Request.Context(), "failed to enqueue scan job", "id", id, "error", err)
