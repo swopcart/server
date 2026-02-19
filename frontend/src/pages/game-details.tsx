@@ -151,80 +151,57 @@ export function GameDetailsPage() {
                   </p>
                 </div>
               )}
-
-              {/* Versions Section */}
-              {game.versions && game.versions.length > 0 && (
-                <div>
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-semibold">
-                      Available Versions
-                    </h2>
-                    {game.versions.length === 1 ? (
-                      <VersionDownloadButton
-                        gameId={game.id}
-                        version={game.versions[0]}
-                      />
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button className="flex gap-2 items-center">
-                            <LucideDownload className="w-4 h-4" />
-                            Download <LucideChevronDown className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          {game.versions.map((version) => (
-                            <DropdownMenuItem
-                              key={version.id}
-                              onClick={() =>
-                                handleVersionDownload(game.id, version)
-                              }
-                            >
-                              <div className="flex flex-col gap-1 w-full">
-                                <span className="font-medium">
-                                  {version.versionName}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {(version.fileSize / 1024 / 1024).toFixed(2)}{" "}
-                                  MB
-                                </span>
-                              </div>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    {game.versions.map((version) => (
-                      <div
-                        key={version.id}
-                        className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition"
-                      >
-                        <div>
-                          <h3 className="font-semibold">
-                            {version.versionName}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            {(version.fileSize / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                          {version.md5 && (
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2 font-mono break-all">
-                              MD5: {version.md5}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
           {/* Right: Sidebar Cards */}
           <div className="space-y-4">
+            {/* Download Section */}
+            {game.versions && game.versions.length > 0 && (
+              <div className="border rounded-lg p-6 bg-white dark:bg-gray-900">
+                <h3 className="font-semibold mb-4">Download</h3>
+                {game.versions.length === 1 ? (
+                  <VersionDownloadButton
+                    gameId={game.id}
+                    version={game.versions[0]}
+                  />
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button className="w-full flex gap-2 items-center justify-center">
+                        <LucideDownload className="w-4 h-4" />
+                        Select Version <LucideChevronDown className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" className="w-48">
+                      {game.versions.map((version) => (
+                        <DropdownMenuItem
+                          key={version.id}
+                          onClick={() =>
+                            handleVersionDownload(game.id, version)
+                          }
+                        >
+                          <div className="flex flex-col gap-1 w-full">
+                            <span className="font-medium">
+                              {version.versionName}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {(version.fileSize / 1024 / 1024).toFixed(2)} MB
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                {game.versions.length > 1 && (
+                  <p className="text-xs text-gray-500 mt-3">
+                    {game.versions.length} versions available
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Play Button Card */}
             <MockOverlay
               className="border rounded-lg p-6 bg-white dark:bg-gray-900"
@@ -348,9 +325,8 @@ function VersionDownloadButton({
 
   return (
     <Button
-      size="sm"
       onClick={handleDownload}
-      className="flex gap-1 items-center"
+      className="w-full flex gap-2 items-center justify-center"
     >
       <LucideDownload className="w-4 h-4" /> Download
     </Button>
