@@ -110,6 +110,17 @@ export function LibraryPage() {
 
             {selectedLibraryId && (
               <>
+                {/* Error Display */}
+                {gamesData && "error" in gamesData && gamesData.error && (
+                  <div className="p-4 bg-red-100 text-red-800 rounded-lg mb-4">
+                    <p className="font-semibold mb-2">Error loading games:</p>
+                    <p className="text-sm">
+                      {gamesData.error.message ||
+                        JSON.stringify(gamesData.error)}
+                    </p>
+                  </div>
+                )}
+
                 {/* Search Bar */}
                 <div className="flex gap-2">
                   <Input
