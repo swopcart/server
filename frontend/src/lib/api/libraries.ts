@@ -9,6 +9,9 @@ import { z } from "zod";
 import { ApiError, fetchWithAuth } from "./client";
 import { LibrarySchema, type Library } from "./types";
 
+// Re-export types for external use
+export type { Library };
+
 // Create library request
 export const CreateLibraryRequestSchema = z.object({
   name: z.string().min(1),

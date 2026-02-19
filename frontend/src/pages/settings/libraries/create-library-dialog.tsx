@@ -165,7 +165,10 @@ export function CreateLibraryDialog({
                   <Spinner className="w-4 h-4" /> Loading platforms...
                 </div>
               ) : (
-                <Select value={platformId} onValueChange={setPlatformId}>
+                <Select
+                  value={platformId}
+                  onValueChange={(value) => setPlatformId(value || "")}
+                >
                   <SelectTrigger id="platform" disabled={loading}>
                     <SelectValue placeholder="Select a platform" />
                   </SelectTrigger>

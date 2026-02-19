@@ -67,7 +67,7 @@ export const PlatformSchema = z.object({
 export type Platform = z.infer<typeof PlatformSchema>;
 
 // Game metadata schemas
-export const ExternalIdsSchema = z.record(z.string());
+export const ExternalIdsSchema = z.record(z.string(), z.string());
 
 export const GameMetadataSchema = z.object({
   title: z.string(),

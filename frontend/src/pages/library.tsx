@@ -62,9 +62,12 @@ export function LibraryPage() {
 
   return (
     <Container>
-      <Header title="Library" subtitle="Browse and discover games" />
+      <Header title="Library" />
 
       <div className="space-y-4">
+        <div className="text-sm text-gray-600 dark:text-gray-400 -mt-2 mb-4">
+          Browse and discover games
+        </div>
         {/* Library Selection */}
         {loadingLibraries ? (
           <div className="flex items-center gap-2">

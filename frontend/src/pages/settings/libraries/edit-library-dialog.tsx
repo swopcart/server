@@ -68,8 +68,8 @@ export function EditLibraryDialog({
 
     const pathList = paths
       .split("\n")
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
+      .map((p: string) => p.trim())
+      .filter((p: string) => p.length > 0);
 
     const request: UpdateLibraryRequest = {
       name: name.trim(),

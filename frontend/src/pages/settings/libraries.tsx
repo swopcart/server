@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type JSX } from "react";
 import { Container } from "@/components/container";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,7 @@ export function LibrariesPage() {
   if (loading) {
     return (
       <Container>
-        <Header title="Libraries" subtitle="Manage your game libraries" />
+        <Header title="Libraries" />
         <div className="flex justify-center items-center py-8">
           <Spinner />
         </div>
@@ -98,7 +98,12 @@ export function LibrariesPage() {
   return (
     <Container>
       <div className="flex justify-between items-center mb-6">
-        <Header title="Libraries" subtitle="Manage your game libraries" />
+        <div>
+          <Header title="Libraries" />
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Manage your game libraries
+          </p>
+        </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           Create Library
         </Button>

@@ -14,13 +14,16 @@ import {
   type GameListResponse,
 } from "./types";
 
+// Re-export types for external use
+export type { Game, GameListResponse };
+
 // Update game metadata request
 export const UpdateGameMetadataRequestSchema = z.object({
   title: z.string().optional(),
   developer: z.string().optional(),
   publisher: z.string().optional(),
   description: z.string().optional(),
-  externalIds: z.record(z.string()).optional(),
+  externalIds: z.record(z.string(), z.string()).optional(),
   regions: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
 });

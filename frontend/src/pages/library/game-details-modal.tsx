@@ -18,6 +18,7 @@ import {
   type Game,
   type UpdateGameMetadataRequest,
 } from "@/lib/api/games";
+import type { GameVersion } from "@/lib/api/types";
 import { useAsync, useAsyncFn } from "@/hooks/use-async";
 import { useFieldErrors } from "@/hooks/use-field-errors";
 import { useAuth } from "@/contexts/auth-context";
@@ -243,7 +244,7 @@ export function GameDetailsModal({
               <div className="space-y-3">
                 <h3 className="font-semibold text-lg">Versions</h3>
                 <div className="space-y-2 border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
-                  {displayGame.versions.map((version) => (
+                  {displayGame.versions.map((version: GameVersion) => (
                     <div
                       key={version.id}
                       className="flex justify-between items-start border-b pb-2 last:border-b-0 last:pb-0"
@@ -292,7 +293,7 @@ export function GameDetailsModal({
                       </p>
                       <div className="flex gap-2 flex-wrap mt-1">
                         {displayGame.versions[0].metadataJson.regions.map(
-                          (region) => (
+                          (region: string) => (
                             <Badge key={region}>{region}</Badge>
                           ),
                         )}
@@ -304,7 +305,7 @@ export function GameDetailsModal({
                       <p className="text-gray-600 dark:text-gray-400">Tags</p>
                       <div className="flex gap-2 flex-wrap mt-1">
                         {displayGame.versions[0].metadataJson.tags.map(
-                          (tag) => (
+                          (tag: string) => (
                             <Badge key={tag} variant="secondary">
                               {tag}
                             </Badge>
