@@ -28,12 +28,11 @@ developer = "Test Developer"
 publisher = "Test Publisher"
 release-date = "1990-01-01"
 description = "A test game"
+regions = ["NTSC", "PAL"]
+tags = ["classic", "action"]
 
 [external-ids]
 vgdb = "12345"
-
-regions = ["NTSC", "PAL"]
-tags = ["classic", "action"]
 `
 
 	if err := os.WriteFile(metaPath, []byte(metaContent), 0644); err != nil {
