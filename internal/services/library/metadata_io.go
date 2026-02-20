@@ -162,10 +162,10 @@ func (svc *LibraryService) StringToMetadata(metadataStr string) (*GameMetadata, 
 
 // ExtractMetadataFromFilename parses filename patterns and extracts metadata
 // Patterns:
-// - [vgdb=XXXXX] → external ID
+// - [provider=id] → external ID (e.g., [igdb=super-metroid], [vgdb=12345])
 // - .pal, .ntsc → region
 // - (v1.0), (Rev A) → version name
-// - (Demo), (Beta) → tags + version name
+// - (Demo), (Beta) → tags
 func (svc *LibraryService) ExtractMetadataFromFilename(filename string, platform string) *GameMetadata {
 	metadata := &GameMetadata{
 		Platform:    platform,
@@ -180,13 +180,40 @@ func (svc *LibraryService) ExtractMetadataFromFilename(filename string, platform
 		title = title[:idx]
 	}
 
-	// Extract vgdb ID: [vgdb=XXXXX]
-	if vgdbMatch := strings.Index(title, "[vgdb="); vgdbMatch >= 0 {
-		endIdx := strings.Index(title[vgdbMatch:], "]")
-		if endIdx >= 0 {
-			vgdbID := title[vgdbMatch+6 : vgdbMatch+endIdx]
-			metadata.ExternalIDs["vgdb"] = vgdbID
-			title = title[:vgdbMatch] + title[vgdbMatch+endIdx+1:]
+	// Extract external IDs: [provider=id] (e.g., [igdb=super-metroid], [vgdb=12345])
+	// Use a loop to handle multiple external IDs
+	for {
+		bracketStart := strings.Index(title, "[")
+		if bracketStart < 0 {
+			break
+		}
+
+		bracketEnd := strings.Index(title[bracketStart:], "]")
+		if bracketEnd < 0 {
+			break
+		}
+
+		bracketEnd += bracketStart
+
+		// Extract content between brackets
+		content := title[bracketStart+1 : bracketEnd]
+
+		// Check if it matches provider=id pattern
+		eqIdx := strings.Index(content, "=")
+		if eqIdx > 0 {
+			provider := content[:eqIdx]
+			id := content[eqIdx+1:]
+
+			// Store external ID
+			if provider != "" && id != "" {
+				metadata.ExternalIDs[provider] = id
+			}
+
+			// Remove the external ID from title
+			title = title[:bracketStart] + title[bracketEnd+1:]
+		} else {
+			// Not a provider=id pattern, skip this bracket
+			break
 		}
 	}
 

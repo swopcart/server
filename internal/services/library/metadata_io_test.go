@@ -367,3 +367,74 @@ func TestExtractMetadataFromFilename_PALRegion(t *testing.T) {
 		t.Errorf("Expected PAL region, got %v", metadata.Regions)
 	}
 }
+
+func TestExtractMetadataFromFilename_ExternalIDs(t *testing.T) {
+	tk := testkit.New(t)
+
+	librarySvc, err := library.NewLibraryService(tk.T.Context(), tk.Config, tk.Logger, tk.DB)
+	if err != nil {
+		t.Fatalf("Failed to create library service: %v", err)
+	}
+
+	// Test single external ID (igdb)
+	filename := "Super Metroid [igdb=super-metroid].sfc"
+	metadata := librarySvc.ExtractMetadataFromFilename(filename, "SNES")
+
+	if metadata.Title != "Super Metroid" {
+		t.Errorf("Expected clean title 'Super Metroid', got %q", metadata.Title)
+	}
+
+	if igdbID, ok := metadata.ExternalIDs["igdb"]; !ok || igdbID != "super-metroid" {
+		t.Errorf("Expected igdb=super-metroid, got %v", metadata.ExternalIDs)
+	}
+}
+
+func TestExtractMetadataFromFilename_MultipleExternalIDs(t *testing.T) {
+	tk := testkit.New(t)
+
+	librarySvc, err := library.NewLibraryService(tk.T.Context(), tk.Config, tk.Logger, tk.DB)
+	if err != nil {
+		t.Fatalf("Failed to create library service: %v", err)
+	}
+
+	// Test multiple external IDs
+	filename := "Super Metroid [igdb=super-metroid] [vgdb=12345].sfc"
+	metadata := librarySvc.ExtractMetadataFromFilename(filename, "SNES")
+
+	if metadata.Title != "Super Metroid" {
+		t.Errorf("Expected clean title 'Super Metroid', got %q", metadata.Title)
+	}
+
+	if igdbID, ok := metadata.ExternalIDs["igdb"]; !ok || igdbID != "super-metroid" {
+		t.Errorf("Expected igdb=super-metroid, got %v", metadata.ExternalIDs)
+	}
+
+	if vgdbID, ok := metadata.ExternalIDs["vgdb"]; !ok || vgdbID != "12345" {
+		t.Errorf("Expected vgdb=12345, got %v", metadata.ExternalIDs)
+	}
+}
+
+func TestExtractMetadataFromFilename_ExternalIDsWithRegions(t *testing.T) {
+	tk := testkit.New(t)
+
+	librarySvc, err := library.NewLibraryService(tk.T.Context(), tk.Config, tk.Logger, tk.DB)
+	if err != nil {
+		t.Fatalf("Failed to create library service: %v", err)
+	}
+
+	// Test external IDs combined with region variants
+	filename := "Super Metroid [igdb=super-metroid].ntsc.sfc"
+	metadata := librarySvc.ExtractMetadataFromFilename(filename, "SNES")
+
+	if metadata.Title != "Super Metroid" {
+		t.Errorf("Expected clean title 'Super Metroid', got %q", metadata.Title)
+	}
+
+	if igdbID, ok := metadata.ExternalIDs["igdb"]; !ok || igdbID != "super-metroid" {
+		t.Errorf("Expected igdb=super-metroid, got %v", metadata.ExternalIDs)
+	}
+
+	if len(metadata.Regions) == 0 || metadata.Regions[0] != "NTSC" {
+		t.Errorf("Expected NTSC region, got %v", metadata.Regions)
+	}
+}
