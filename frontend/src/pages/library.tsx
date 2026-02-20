@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { listLibraries } from "@/lib/api/libraries";
-import { listGamesByLibrary } from "@/lib/api/games";
-import type { Game, Library } from "@/lib/api/types";
+import { searchGames } from "@/lib/api/games";
+
 import { useAsync } from "@/hooks/use-async";
 import {
   LucideChevronLeft,
@@ -50,15 +50,6 @@ export function LibraryPage() {
 
   const pageSize = 50;
 
-  // Create library lookup map
-  const libraryMap = useMemo(() => {
-    const map = new Map<string, Library>();
-    libraries?.forEach((lib) => {
-      map.set(lib.id, lib);
-    });
-    return map;
-  }, [libraries]);
-
   // Get unique platforms from libraries
   const platforms = useMemo(() => {
     const platformSet = new Set<string>();
@@ -70,89 +61,71 @@ export function LibraryPage() {
     return Array.from(platformSet).sort();
   }, [libraries]);
 
-  // Get all games from all libraries, then filter
-  const { data: allGamesData, loading: loadingGames } = useAsync(async () => {
-    if (!libraries || libraries.length === 0) {
-      return { items: [], total: 0, offset: 0 };
-    }
+  // Build search params from filters
+  const searchQuery = useMemo(() => {
+    return filters.find((f) => f.type === "search")?.value || "";
+  }, [filters]);
 
+  const selectedLibraryId = useMemo(() => {
+    return filters.find((f) => f.type === "library")?.value;
+  }, [filters]);
+
+  const selectedPlatformId = useMemo(() => {
+    const platformName = filters.find((f) => f.type === "platform")?.value;
+    if (!platformName) return undefined;
+    // Find platform ID from libraries
+    for (const lib of libraries || []) {
+      if (lib.platformName === platformName) {
+        return lib.platformId;
+      }
+    }
+    return undefined;
+  }, [filters, libraries]);
+
+  // Fetch games with search and filters applied server-side
+  const { data: gamesData, loading: loadingGames } = useAsync(async () => {
     try {
-      // For now, fetch from first library and combine
-      // In a production app, you'd want a "list all games" API endpoint
-      const allGames: Game[] = [];
-
-      for (const lib of libraries) {
-        const data = await listGamesByLibrary(lib.id, 0, 1000); // Fetch all
-        if (data && "items" in data) {
-          allGames.push(...data.items);
-        }
-      }
-
-      return {
-        items: allGames,
-        total: allGames.length,
-        offset: 0,
-      };
+      return await searchGames(
+        currentPage * pageSize,
+        pageSize,
+        searchQuery || undefined,
+        selectedLibraryId,
+        selectedPlatformId,
+      );
     } catch (error) {
-      console.error("Failed to load games:", error);
+      console.error("Failed to search games:", error);
       return { items: [], total: 0, offset: 0 };
     }
-  }, [libraries]) as {
-    data: { items: Game[]; total: number; offset: number };
-    loading: boolean;
-    error: Error | null;
-  };
+  }, [
+    currentPage,
+    pageSize,
+    searchQuery,
+    selectedLibraryId,
+    selectedPlatformId,
+  ]);
 
-  // Filter games based on active filters
+  // Filter client-side only for region (since that requires checking metadata)
   const filteredGames = useMemo(() => {
-    if (!allGamesData?.items) return [];
+    if (!gamesData?.items) return [];
 
-    return allGamesData.items.filter((game) => {
-      for (const filter of filters) {
-        switch (filter.type) {
-          case "search": {
-            const query = filter.value.toLowerCase();
-            const matchesTitle = game.title.toLowerCase().includes(query);
-            const matchesVersion = game.versions?.some((v) =>
-              v.versionName?.toLowerCase().includes(query),
-            );
-            if (!matchesTitle && !matchesVersion) return false;
-            break;
-          }
-          case "region": {
-            // Check if any version has this region
-            const hasRegion = game.versions?.some((v) => {
-              const regions = v.metadataJson?.regions;
-              return Array.isArray(regions) && regions.includes(filter.value);
-            });
-            if (!hasRegion) return false;
-            break;
-          }
-          case "platform": {
-            // Check if game's library matches the selected platform
-            const lib = libraryMap.get(game.libraryId);
-            if (lib?.platformName !== filter.value) return false;
-            break;
-          }
-          case "library": {
-            // Check if game is in the selected library
-            if (game.libraryId !== filter.value) return false;
-            break;
-          }
-        }
-      }
-      return true;
+    const regionFilter = filters.find((f) => f.type === "region");
+    if (!regionFilter) {
+      return gamesData.items;
+    }
+
+    return gamesData.items.filter((game) => {
+      const hasRegion = game.versions?.some((v) => {
+        const regions = v.metadataJson?.regions;
+        return Array.isArray(regions) && regions.includes(regionFilter.value);
+      });
+      return hasRegion;
     });
-  }, [allGamesData, filters, libraryMap]);
+  }, [gamesData, filters]);
 
-  // Paginate filtered games
-  const paginatedGames = useMemo(() => {
-    const start = currentPage * pageSize;
-    const end = start + pageSize;
-    return filteredGames.slice(start, end);
-  }, [filteredGames, currentPage]);
+  // Games are already paginated from server, just apply region filter
+  const paginatedGames = filteredGames;
 
-  const totalPages = Math.ceil((filteredGames.length || 0) / pageSize);
+  const totalPages = Math.ceil((gamesData?.total || 0) / pageSize);
 
   const addSearchFilter = () => {
     if (searchInput.trim()) {
@@ -188,16 +161,16 @@ export function LibraryPage() {
 
   const regions = useMemo(() => {
     const regionSet = new Set<string>();
-    allGamesData?.items?.forEach((game) => {
+    gamesData?.items?.forEach((game) => {
       game.versions?.forEach((v) => {
-        const regions = v.metadataJson?.regions;
-        if (Array.isArray(regions)) {
-          regions.forEach((r: string) => regionSet.add(r));
+        const regionsArray = v.metadataJson?.regions;
+        if (Array.isArray(regionsArray)) {
+          regionsArray.forEach((r: string) => regionSet.add(r));
         }
       });
     });
     return Array.from(regionSet).sort();
-  }, [allGamesData?.items]);
+  }, [gamesData?.items]);
 
   return (
     <>

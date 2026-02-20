@@ -35,6 +35,48 @@ export type UpdateGameMetadataRequest = z.infer<
 // API functions
 
 /**
+ * Search games across all libraries with optional filters
+ */
+export async function searchGames(
+  offset?: number,
+  limit?: number,
+  search?: string,
+  libraryId?: string,
+  platformId?: number,
+): Promise<GameListResponse> {
+  const params = new URLSearchParams();
+
+  if (offset !== undefined) {
+    params.append("offset", offset.toString());
+  }
+  if (limit !== undefined) {
+    params.append("limit", limit.toString());
+  }
+  if (search) {
+    params.append("q", search);
+  }
+  if (libraryId) {
+    params.append("libraryId", libraryId);
+  }
+  if (platformId !== undefined) {
+    params.append("platformId", platformId.toString());
+  }
+
+  const path = "/games" + (params.toString() ? `?${params.toString()}` : "");
+
+  const response = await fetchWithAuth(path, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    throw new ApiError(response.status, body);
+  }
+
+  return GameListResponseSchema.parse(await response.json());
+}
+
+/**
  * List games in a library with pagination and search
  */
 export async function listGamesByLibrary(
