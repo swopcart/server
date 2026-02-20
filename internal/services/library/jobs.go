@@ -317,14 +317,26 @@ func (svc *LibraryService) generateMetadataFromFolder(
 		return nil, nil // No ROMs found
 	}
 
-	// Use folder name as game title
+	// Use folder name as base for game title, but extract metadata from it
 	folderName := filepath.Base(folderPath)
+
+	// Extract metadata from folder name (gets title, external IDs, regions, etc.)
+	folderMetadata := svc.ExtractMetadataFromFilename(folderName, platformName)
+
+	// Use extracted title if available, otherwise use folder name
+	title := folderMetadata.Title
+	if title == "" {
+		title = folderName
+	}
 
 	// Generate metadata from the folder name and ROM files
 	metadata := &GameMetadata{
-		Title:    folderName,
-		Platform: platformName,
-		Versions: make([]VersionMetadata, 0),
+		Title:       title,
+		Platform:    platformName,
+		ExternalIDs: folderMetadata.ExternalIDs,
+		Regions:     folderMetadata.Regions,
+		Tags:        folderMetadata.Tags,
+		Versions:    make([]VersionMetadata, 0),
 	}
 
 	// Create a version for each ROM file
