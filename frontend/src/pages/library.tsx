@@ -201,16 +201,18 @@ export function LibraryPage() {
 
   return (
     <Container>
-      <div className="flex items-center justify-between gap-4">
-        <Header title="All Games" />
-        <Button
-          size="icon"
-          variant="outline"
-          onClick={() => setShowSearchModal(true)}
-        >
-          <LucideSearch className="w-4 h-4" />
-        </Button>
-      </div>
+      <Header
+        title="All Games"
+        actions={
+          <Button
+            size="icon"
+            variant="outline"
+            onClick={() => setShowSearchModal(true)}
+          >
+            <LucideSearch className="w-4 h-4" />
+          </Button>
+        }
+      />
 
       <div className="space-y-4">
         {/* Search Modal */}
