@@ -209,6 +209,75 @@ func (svc *LibraryService) scanLibrary(
 	return nil
 }
 
+// generateMetadataFromFolder scans a folder for ROM files and generates metadata
+func (svc *LibraryService) generateMetadataFromFolder(
+	ctx context.Context,
+	folderPath string,
+	platformName string,
+	extensions []string,
+) (*GameMetadata, error) {
+	entries, err := os.ReadDir(folderPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read folder: %w", err)
+	}
+
+	// Collect all ROM files (top-level only, not in subdirectories)
+	var romFiles []os.DirEntry
+	for _, entry := range entries {
+		if !entry.IsDir() && matchesExtension(filepath.Join(folderPath, entry.Name()), extensions) {
+			romFiles = append(romFiles, entry)
+		}
+	}
+
+	if len(romFiles) == 0 {
+		return nil, nil // No ROMs found
+	}
+
+	// Use folder name as game title
+	folderName := filepath.Base(folderPath)
+
+	// Generate metadata from the folder name and ROM files
+	metadata := &GameMetadata{
+		Title:    folderName,
+		Platform: platformName,
+		Versions: make([]VersionMetadata, 0),
+	}
+
+	// Create a version for each ROM file
+	for _, romFile := range romFiles {
+		filename := romFile.Name()
+
+		// Extract metadata from filename to get regions and other info
+		fileMetadata := svc.ExtractMetadataFromFilename(filename, platformName)
+
+		// Use filename (without extension) as version name
+		versionName := filename
+		if idx := strings.LastIndexByte(versionName, '.'); idx >= 0 {
+			versionName = versionName[:idx]
+		}
+
+		version := VersionMetadata{
+			Name:     versionName,
+			Filename: filename,
+			Regions:  fileMetadata.Regions,
+		}
+
+		metadata.Versions = append(metadata.Versions, version)
+
+		// Inherit developer/publisher from first ROM's extracted metadata
+		if len(metadata.Versions) == 1 {
+			if fileMetadata.Developer != "" {
+				metadata.Developer = fileMetadata.Developer
+			}
+			if fileMetadata.Publisher != "" {
+				metadata.Publisher = fileMetadata.Publisher
+			}
+		}
+	}
+
+	return metadata, nil
+}
+
 // processFolderGame processes a game folder with metadata.toml and ROM files inside
 func (svc *LibraryService) processFolderGame(
 	ctx context.Context,
@@ -224,12 +293,26 @@ func (svc *LibraryService) processFolderGame(
 	metadata, err := svc.LoadMetadataFromFile(metadataPath)
 	if err != nil {
 		logger.WarnContext(ctx, "failed to load metadata.toml", "folder", folderPath, "error", err)
-		return nil // Skip folder if metadata can't be loaded
+		return nil // Skip folder if metadata can't be parsed
 	}
 
+	// If no metadata file exists, auto-generate from folder structure
 	if metadata == nil {
-		// No metadata file, skip this folder
-		return nil
+		metadata, err = svc.generateMetadataFromFolder(ctx, folderPath, platform.Name, extensions)
+		if err != nil {
+			logger.WarnContext(ctx, "failed to generate metadata from folder", "folder", folderPath, "error", err)
+			return nil
+		}
+
+		if metadata == nil || len(metadata.Versions) == 0 {
+			// No ROMs found in folder
+			return nil
+		}
+
+		// Save generated metadata for future scans
+		if err := svc.SaveMetadataToFile(metadataPath, metadata); err != nil {
+			logger.WarnContext(ctx, "failed to save generated metadata", "path", metadataPath, "error", err)
+		}
 	}
 
 	// Get or create game
