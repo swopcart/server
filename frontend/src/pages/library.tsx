@@ -200,7 +200,7 @@ export function LibraryPage() {
   }, [allGamesData?.items]);
 
   return (
-    <Container>
+    <>
       <Header
         title="All Games"
         actions={
@@ -214,242 +214,246 @@ export function LibraryPage() {
         }
       />
 
-      <div className="space-y-4">
-        {/* Search Modal */}
-        <Dialog open={showSearchModal} onOpenChange={setShowSearchModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Search Games</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Input
-                placeholder="Search by title, version name, keywords..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    addSearchFilter();
-                  }
-                }}
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowSearchModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={addSearchFilter}
-                  disabled={!searchInput.trim()}
-                >
-                  Add Search Filter
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {loadingLibraries ? (
-          <div className="flex items-center gap-2">
-            <Spinner className="w-4 h-4" /> Loading libraries...
-          </div>
-        ) : !libraries || libraries.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-500 mb-4">
-              No libraries available. Ask an administrator to create one.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Filter Pills */}
-            <div className="space-y-3">
-              {filters.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {filters.map((filter, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="gap-2 pl-3 pr-1"
-                    >
-                      {filter.label}
-                      <button
-                        onClick={() => removeFilter(index)}
-                        className="hover:bg-gray-200 dark:hover:bg-gray-700 rounded p-1"
-                      >
-                        <LucideX className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
+      <Container>
+        <div className="space-y-4 pt-4">
+          {/* Search Modal */}
+          <Dialog open={showSearchModal} onOpenChange={setShowSearchModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Search Games</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Search by title, version name, keywords..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      addSearchFilter();
+                    }
+                  }}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSearchModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={addSearchFilter}
+                    disabled={!searchInput.trim()}
+                  >
+                    Add Search Filter
+                  </Button>
                 </div>
-              )}
-
-              {/* Filter Dropdowns */}
-              <div className="flex flex-wrap gap-2">
-                {regions.length > 0 && (
-                  <Select
-                    onValueChange={(value) =>
-                      addFilter(
-                        "region",
-                        (value as string) || "",
-                        `Region: ${value}`,
-                      )
-                    }
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {regions.map((region) => (
-                        <SelectItem key={region} value={region}>
-                          {region}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {platforms.length > 0 && (
-                  <Select
-                    onValueChange={(value) =>
-                      addFilter(
-                        "platform",
-                        (value as string) || "",
-                        `Platform: ${value}`,
-                      )
-                    }
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Platform" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {platforms.map((platform) => (
-                        <SelectItem key={platform} value={platform}>
-                          {platform}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {libraries.length > 1 && (
-                  <Select
-                    onValueChange={(value) =>
-                      addFilter(
-                        "library",
-                        (value as string) || "",
-                        `Library: ${libraries.find((l) => l.id === value)?.name || value}`,
-                      )
-                    }
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Library" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {libraries.map((lib) => (
-                        <SelectItem key={lib.id} value={lib.id}>
-                          {lib.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
               </div>
+            </DialogContent>
+          </Dialog>
+
+          {loadingLibraries ? (
+            <div className="flex items-center gap-2">
+              <Spinner className="w-4 h-4" /> Loading libraries...
             </div>
-
-            {/* Games Grid */}
-            {loadingGames ? (
-              <div className="flex justify-center items-center py-8">
-                <Spinner />
-              </div>
-            ) : !paginatedGames || paginatedGames.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">
-                  {filters.length > 0
-                    ? "No games match your filters"
-                    : "No games found"}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {paginatedGames.map((game) => (
-                    <button
-                      key={game.id}
-                      onClick={() => navigate(`/game/${game.id}`)}
-                      className="group cursor-pointer"
-                    >
-                      {/* Cover Art Placeholder */}
-                      <div className="relative aspect-[2/3] bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-700 dark:to-gray-800 rounded-lg overflow-hidden mb-2 group-hover:shadow-lg transition-shadow">
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-gray-600 dark:text-gray-400 text-xs text-center px-2">
-                            No Cover
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Game Info */}
-                      <div className="space-y-1">
-                        <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          {game.title}
-                        </h3>
-                        {game.releasedDate && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            {new Date(game.releasedDate).getFullYear()}
-                          </p>
-                        )}
-                        {game.versions && game.versions.length > 0 && (
-                          <p className="text-xs text-gray-500 dark:text-gray-500">
-                            {game.versions.length} version
-                            {game.versions.length !== 1 ? "s" : ""}
-                          </p>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex justify-between items-center mt-8 pt-4 border-t">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Showing {currentPage * pageSize + 1} to{" "}
-                      {Math.min(
-                        (currentPage + 1) * pageSize,
-                        filteredGames.length,
-                      )}{" "}
-                      of {filteredGames.length} games
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
+          ) : !libraries || libraries.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">
+                No libraries available. Ask an administrator to create one.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Filter Pills */}
+              <div className="space-y-3">
+                {filters.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {filters.map((filter, index) => (
+                      <Badge
+                        key={index}
                         variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setCurrentPage((p) => Math.max(0, p - 1))
-                        }
-                        disabled={currentPage === 0 || loadingGames}
-                        className="flex gap-1"
+                        className="gap-2 pl-3 pr-1"
                       >
-                        <LucideChevronLeft className="w-4 h-4" /> Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => p + 1)}
-                        disabled={currentPage >= totalPages - 1 || loadingGames}
-                        className="flex gap-1"
-                      >
-                        Next <LucideChevronRight className="w-4 h-4" />
-                      </Button>
-                    </div>
+                        {filter.label}
+                        <button
+                          onClick={() => removeFilter(index)}
+                          className="hover:bg-gray-200 dark:hover:bg-gray-700 rounded p-1"
+                        >
+                          <LucideX className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
                   </div>
                 )}
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </Container>
+
+                {/* Filter Dropdowns */}
+                <div className="flex flex-wrap gap-2">
+                  {regions.length > 0 && (
+                    <Select
+                      onValueChange={(value) =>
+                        addFilter(
+                          "region",
+                          (value as string) || "",
+                          `Region: ${value}`,
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regions.map((region) => (
+                          <SelectItem key={region} value={region}>
+                            {region}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {platforms.length > 0 && (
+                    <Select
+                      onValueChange={(value) =>
+                        addFilter(
+                          "platform",
+                          (value as string) || "",
+                          `Platform: ${value}`,
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Platform" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {platforms.map((platform) => (
+                          <SelectItem key={platform} value={platform}>
+                            {platform}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {libraries.length > 1 && (
+                    <Select
+                      onValueChange={(value) =>
+                        addFilter(
+                          "library",
+                          (value as string) || "",
+                          `Library: ${libraries.find((l) => l.id === value)?.name || value}`,
+                        )
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Library" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {libraries.map((lib) => (
+                          <SelectItem key={lib.id} value={lib.id}>
+                            {lib.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+
+              {/* Games Grid */}
+              {loadingGames ? (
+                <div className="flex justify-center items-center py-8">
+                  <Spinner />
+                </div>
+              ) : !paginatedGames || paginatedGames.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">
+                    {filters.length > 0
+                      ? "No games match your filters"
+                      : "No games found"}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {paginatedGames.map((game) => (
+                      <button
+                        key={game.id}
+                        onClick={() => navigate(`/game/${game.id}`)}
+                        className="group cursor-pointer"
+                      >
+                        {/* Cover Art Placeholder */}
+                        <div className="relative aspect-[2/3] bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-700 dark:to-gray-800 rounded-lg overflow-hidden mb-2 group-hover:shadow-lg transition-shadow">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-gray-600 dark:text-gray-400 text-xs text-center px-2">
+                              No Cover
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Game Info */}
+                        <div className="space-y-1">
+                          <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            {game.title}
+                          </h3>
+                          {game.releasedDate && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {new Date(game.releasedDate).getFullYear()}
+                            </p>
+                          )}
+                          {game.versions && game.versions.length > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              {game.versions.length} version
+                              {game.versions.length !== 1 ? "s" : ""}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex justify-between items-center mt-8 pt-4 border-t">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Showing {currentPage * pageSize + 1} to{" "}
+                        {Math.min(
+                          (currentPage + 1) * pageSize,
+                          filteredGames.length,
+                        )}{" "}
+                        of {filteredGames.length} games
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCurrentPage((p) => Math.max(0, p - 1))
+                          }
+                          disabled={currentPage === 0 || loadingGames}
+                          className="flex gap-1"
+                        >
+                          <LucideChevronLeft className="w-4 h-4" /> Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => p + 1)}
+                          disabled={
+                            currentPage >= totalPages - 1 || loadingGames
+                          }
+                          className="flex gap-1"
+                        >
+                          Next <LucideChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </Container>
+    </>
   );
 }
