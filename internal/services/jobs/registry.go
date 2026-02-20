@@ -132,6 +132,63 @@ func (svc *JobService) RegisterScheduledJob(
 	return svc.addToCron(job)
 }
 
+// RegisterOnDemandJob registers a job that is only triggered manually (no schedule)
+func (svc *JobService) RegisterOnDemandJob(
+	ctx context.Context,
+	name string,
+	description string,
+	handler JobHandler,
+	opts ...JobOption,
+) error {
+	// Register handler first
+	if err := svc.RegisterHandler(name, handler); err != nil && !errors.Is(err, ErrHandlerAlreadyRegistered) {
+		return err
+	}
+
+	// Create job in database without schedule
+	jobUUID := uuid.New()
+	job := database.Job{
+		UUID:        jobUUID,
+		Name:        name,
+		Description: description,
+		Schedule:    nil, // No schedule - manual only
+		Enabled:     true,
+		Priority:    0,
+		Queue:       "default",
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&job)
+	}
+
+	// Upsert job (update if exists, create otherwise)
+	err := svc.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing database.Job
+		err := tx.Where("name = ?", name).First(&existing).Error
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Create new job
+			return tx.Create(&job).Error
+		} else if err != nil {
+			return err
+		}
+
+		// Update existing job
+		job.ID = existing.ID
+		job.UUID = existing.UUID
+		return tx.Save(&job).Error
+	})
+
+	if err != nil {
+		return errors.Join(ErrInternal, err)
+	}
+
+	// Don't add to cron scheduler - this job is manual only
+	svc.logger.Debug("Registered on-demand job", "name", name)
+	return nil
+}
+
 // EnqueueJob enqueues a job for immediate execution
 func (svc *JobService) EnqueueJob(
 	ctx context.Context,
