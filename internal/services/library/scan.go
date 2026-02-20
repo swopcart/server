@@ -16,8 +16,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// reimportLibrary permanently deletes all games and versions from a library, then rescans
-func (svc *LibraryService) reimportLibrary(
+// ReimportLibrary permanently deletes all games and versions from a library, then rescans
+func (svc *LibraryService) ReimportLibrary(
 	ctx context.Context,
 	logger *slog.Logger,
 	lib *database.Library,
@@ -54,11 +54,11 @@ func (svc *LibraryService) reimportLibrary(
 	logger.InfoContext(ctx, "Deleted all games from library", "id", lib.ID)
 
 	// Now rescan the library to reimport everything
-	return svc.scanLibrary(ctx, logger, lib, progress)
+	return svc.ScanLibrary(ctx, logger, lib, progress)
 }
 
-// scanLibrary scans a single library for games
-func (svc *LibraryService) scanLibrary(
+// ScanLibrary scans a single library for games
+func (svc *LibraryService) ScanLibrary(
 	ctx context.Context,
 	logger *slog.Logger,
 	lib *database.Library,

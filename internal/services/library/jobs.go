@@ -61,7 +61,7 @@ func (svc *LibraryService) libraryScanJob(
 	}
 
 	for _, lib := range libraries {
-		if err := svc.scanLibrary(ctx, logger, &lib, progress); err != nil {
+		if err := svc.ScanLibrary(ctx, logger, &lib, progress); err != nil {
 			logger.ErrorContext(ctx, "failed to scan library", "id", lib.ID, "error", err)
 			// Continue scanning other libraries
 		}
@@ -93,7 +93,7 @@ func (svc *LibraryService) libraryReimportJob(
 	}
 
 	for _, lib := range libraries {
-		if err := svc.reimportLibrary(ctx, logger, &lib, progress); err != nil {
+		if err := svc.ReimportLibrary(ctx, logger, &lib, progress); err != nil {
 			logger.ErrorContext(ctx, "failed to reimport library", "id", lib.ID, "error", err)
 			// Continue reimporting other libraries
 		}
