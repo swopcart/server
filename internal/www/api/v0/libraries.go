@@ -284,3 +284,51 @@ func (h *APIHandlers) TriggerLibraryScanHandler(c *gin.Context) {
 		"status":      "pending",
 	})
 }
+
+// TriggerLibraryReimportHandler deletes all games and reimports from disk
+func (h *APIHandlers) TriggerLibraryReimportHandler(c *gin.Context) {
+	// Check admin access
+	sessionData := getSessionData(c)
+	if !sessionData.Admin {
+		respondError(c, http.StatusForbidden, ErrCodeOnlyAdmins, "Only administrators can access this resource")
+		return
+	}
+
+	libraryID := c.Param("libraryId")
+	id, err := uuid.Parse(libraryID)
+	if err != nil {
+		respondFieldError(c, http.StatusBadRequest, ErrCodeInvalidUUID, "Invalid library ID", ".libraryId")
+		return
+	}
+
+	// Check if library exists
+	lib, err := h.services.Library.GetLibrary(c.Request.Context(), id)
+	if err != nil {
+		respondError(c, http.StatusNotFound, ErrCodeLibraryNotFound, "Library not found")
+		return
+	}
+
+	// Check if scan/reimport already in progress
+	if lib.CurrentScanJobID != nil {
+		respondError(c, http.StatusConflict, ErrCodeScanAlreadyInProgress, "Scan/reimport already in progress for this library")
+		return
+	}
+
+	// Enqueue reimport job with parameters
+	executionID, err := h.services.Jobs.EnqueueJob(
+		c.Request.Context(),
+		"library.reimport",
+		jobs.WithParameters(jobs.Params{"libraries": id.String()}),
+	)
+
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "failed to enqueue reimport job", "id", id, "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"executionId": executionID.String(),
+		"status":      "pending",
+	})
+}

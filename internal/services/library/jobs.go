@@ -30,6 +30,10 @@ func (svc *LibraryService) RegisterJobs(jobSvc *jobs.JobService) error {
 				"libraries": "*",
 			}),
 		),
+		jobSvc.RegisterHandler(
+			"library.reimport",
+			svc.libraryReimportJob,
+		),
 	}
 
 	return errors.Join(errs...)
@@ -64,6 +68,60 @@ func (svc *LibraryService) libraryScanJob(
 	}
 
 	return nil
+}
+
+// libraryReimportJob deletes all game data and reimports everything
+func (svc *LibraryService) libraryReimportJob(
+	ctx context.Context,
+	logger *slog.Logger,
+	params jobs.Params,
+	progress jobs.ProgressReporter,
+) error {
+	librariesParam := params["libraries"]
+
+	// Get list of libraries to reimport
+	var libraries []database.Library
+	query := svc.db.WithContext(ctx)
+
+	if librariesParam != "*" {
+		// If specific library ID provided, filter by it
+		query = query.Where("id = ?", librariesParam)
+	}
+
+	if err := query.Find(&libraries).Error; err != nil {
+		return err
+	}
+
+	for _, lib := range libraries {
+		if err := svc.reimportLibrary(ctx, logger, &lib, progress); err != nil {
+			logger.ErrorContext(ctx, "failed to reimport library", "id", lib.ID, "error", err)
+			// Continue reimporting other libraries
+		}
+	}
+
+	return nil
+}
+
+// reimportLibrary permanently deletes all games and versions from a library, then rescans
+func (svc *LibraryService) reimportLibrary(
+	ctx context.Context,
+	logger *slog.Logger,
+	lib *database.Library,
+	progress jobs.ProgressReporter,
+) error {
+	// Delete all games (and their versions via cascade) from this library
+	// Using hard delete (not soft delete) to completely clear the library
+	if err := svc.db.WithContext(ctx).
+		Where("library_id = ?", lib.ID).
+		Unscoped(). // Hard delete - bypass soft delete
+		Delete(&database.Game{}).Error; err != nil {
+		return fmt.Errorf("failed to delete games from library: %w", err)
+	}
+
+	logger.InfoContext(ctx, "Deleted all games from library", "id", lib.ID)
+
+	// Now rescan the library to reimport everything
+	return svc.scanLibrary(ctx, logger, lib, progress)
 }
 
 // scanLibrary scans a single library for games

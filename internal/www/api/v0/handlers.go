@@ -87,6 +87,7 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 		libraries.PATCH("/:libraryId", h.UpdateLibraryHandler)
 		libraries.DELETE("/:libraryId", h.DeleteLibraryHandler)
 		libraries.POST("/:libraryId/scan", h.TriggerLibraryScanHandler)
+		libraries.POST("/:libraryId/reimport", h.TriggerLibraryReimportHandler)
 	}
 
 	games := r.Group("/games", h.authMiddleware())
