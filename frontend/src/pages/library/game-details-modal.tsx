@@ -287,31 +287,55 @@ export function GameDetailsModal({
               <div className="space-y-3">
                 <h3 className="font-semibold text-lg">Additional Metadata</h3>
                 <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900 text-sm space-y-2">
-                  {displayGame.versions[0].metadataJson?.regions && (
+                  {Array.isArray(
+                    (
+                      displayGame.versions[0].metadataJson as Record<
+                        string,
+                        unknown
+                      >
+                    )?.regions,
+                  ) && (
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">
                         Regions
                       </p>
                       <div className="flex gap-2 flex-wrap mt-1">
-                        {displayGame.versions[0].metadataJson.regions.map(
-                          (region: string) => (
-                            <Badge key={region}>{region}</Badge>
-                          ),
-                        )}
+                        {(
+                          (
+                            displayGame.versions[0].metadataJson as Record<
+                              string,
+                              unknown
+                            >
+                          ).regions as string[]
+                        ).map((region: string) => (
+                          <Badge key={region}>{region}</Badge>
+                        ))}
                       </div>
                     </div>
                   )}
-                  {displayGame.versions[0].metadataJson?.tags && (
+                  {Array.isArray(
+                    (
+                      displayGame.versions[0].metadataJson as Record<
+                        string,
+                        unknown
+                      >
+                    )?.tags,
+                  ) && (
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Tags</p>
                       <div className="flex gap-2 flex-wrap mt-1">
-                        {displayGame.versions[0].metadataJson.tags.map(
-                          (tag: string) => (
-                            <Badge key={tag} variant="secondary">
-                              {tag}
-                            </Badge>
-                          ),
-                        )}
+                        {(
+                          (
+                            displayGame.versions[0].metadataJson as Record<
+                              string,
+                              unknown
+                            >
+                          ).tags as string[]
+                        ).map((tag: string) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                   )}

@@ -167,7 +167,7 @@ export function GameDetailsPage() {
                   />
                 ) : (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    <DropdownMenuTrigger>
                       <Button className="w-full flex gap-2 items-center justify-center">
                         <LucideDownload className="w-4 h-4" />
                         Select Version <LucideChevronDown className="w-4 h-4" />

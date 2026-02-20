@@ -93,7 +93,7 @@ export const GameVersionSchema = z.object({
   sha1: z.string().optional(),
   sha256: z.string().optional(),
   blake3: z.string().optional(),
-  metadataJson: z.record(z.any()).optional(),
+  metadataJson: z.record(z.string(), z.any()).optional(),
 });
 
 export type GameVersion = z.infer<typeof GameVersionSchema>;
@@ -102,6 +102,7 @@ export type GameVersion = z.infer<typeof GameVersionSchema>;
 export const GameSchema = z.object({
   id: z.string(),
   title: z.string(),
+  libraryId: z.string(),
   platformId: z.number(),
   developer: z.string().optional().nullable(),
   publisher: z.string().optional().nullable(),

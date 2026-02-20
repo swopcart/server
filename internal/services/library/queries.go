@@ -14,6 +14,7 @@ import (
 type GameWithVersions struct {
 	ID           uuid.UUID              `json:"id"`
 	Title        string                 `json:"title"`
+	LibraryID    uuid.UUID              `json:"libraryId"`
 	PlatformID   uint                   `json:"platformId"`
 	Developer    *string                `json:"developer,omitempty"`
 	Publisher    *string                `json:"publisher,omitempty"`
@@ -159,6 +160,7 @@ func (svc *LibraryService) gameToResponse(game database.Game) GameWithVersions {
 	return GameWithVersions{
 		ID:           game.ID,
 		Title:        game.Title,
+		LibraryID:    game.LibraryID,
 		PlatformID:   game.PlatformID,
 		Developer:    game.Developer,
 		Publisher:    game.Publisher,
