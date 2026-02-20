@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/swopcart/server/internal/services/library"
 )
 
 // UpdateGameMetadataRequest is the request body for updating game metadata
@@ -28,6 +29,59 @@ type GameListResponse struct {
 	Items  interface{} `json:"items"`
 	Offset int         `json:"offset"`
 	Total  int64       `json:"total"`
+}
+
+// SearchGamesHandler searches games with optional filters (platformId, libraryId)
+func (h *APIHandlers) SearchGamesHandler(c *gin.Context) {
+	// Get pagination parameters
+	offset := 0
+	limit := 50
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	// Get search query
+	search := c.Query("q")
+
+	// Build service filters
+	serviceFilters := library.GameSearchFilters{
+		Search: search,
+		Offset: offset,
+		Limit:  limit,
+	}
+
+	// Apply optional filters
+	if platformIDStr := c.Query("platformId"); platformIDStr != "" {
+		if p, err := strconv.ParseUint(platformIDStr, 10, 32); err == nil {
+			p32 := uint(p)
+			serviceFilters.PlatformID = &p32
+		}
+	}
+	if libraryIDStr := c.Query("libraryId"); libraryIDStr != "" {
+		if id, err := uuid.Parse(libraryIDStr); err == nil {
+			serviceFilters.LibraryID = &id
+		}
+	}
+
+	games, total, err := h.services.Library.SearchGames(c.Request.Context(), serviceFilters)
+	if err != nil {
+		h.logger.ErrorContext(c.Request.Context(), "failed to search games", "error", err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, GameListResponse{
+		Items:  games,
+		Offset: offset,
+		Total:  total,
+	})
 }
 
 // ListGamesHandler returns games in a library with pagination

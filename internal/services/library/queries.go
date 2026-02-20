@@ -10,6 +10,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// GameSearchFilters represents search and filter parameters for games
+type GameSearchFilters struct {
+	Search     string     // Search in title
+	LibraryID  *uuid.UUID // Filter by library
+	PlatformID *uint      // Filter by platform
+	Offset     int
+	Limit      int
+}
+
 // GameWithVersions represents a game with all its versions for API responses
 type GameWithVersions struct {
 	ID           uuid.UUID              `json:"id"`
@@ -63,6 +72,53 @@ func (svc *LibraryService) GetGamesByLibrary(
 	if err := query.
 		Offset(offset).
 		Limit(limit).
+		Preload("Versions").
+		Find(&games).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Convert to response format
+	results := make([]GameWithVersions, len(games))
+	for i, game := range games {
+		results[i] = svc.gameToResponse(game)
+	}
+
+	return results, total, nil
+}
+
+// SearchGames searches and filters games across all or specific libraries
+func (svc *LibraryService) SearchGames(
+	ctx context.Context,
+	filters GameSearchFilters,
+) ([]GameWithVersions, int64, error) {
+	var games []database.Game
+	query := svc.db.WithContext(ctx)
+
+	// Apply search filter if provided
+	if filters.Search != "" {
+		query = query.Where("title ILIKE ?", "%"+filters.Search+"%")
+	}
+
+	// Apply library filter if provided
+	if filters.LibraryID != nil {
+		query = query.Where("library_id = ?", *filters.LibraryID)
+	}
+
+	// Apply platform filter if provided
+	if filters.PlatformID != nil {
+		query = query.Where("platform_id = ?", *filters.PlatformID)
+	}
+
+	// Get total count
+	var total int64
+	if err := query.Model(&database.Game{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	if err := query.
+		Offset(filters.Offset).
+		Limit(filters.Limit).
 		Preload("Versions").
 		Find(&games).Error; err != nil {
 		return nil, 0, err

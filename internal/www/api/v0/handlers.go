@@ -92,6 +92,7 @@ func (h *APIHandlers) InstallRoutes(r *gin.RouterGroup) {
 
 	games := r.Group("/games", h.authMiddleware())
 	{
+		games.GET("", h.SearchGamesHandler)
 		games.GET("/by-library/:libraryId", h.ListGamesHandler)
 		games.GET("/:gameId", h.GetGameHandler)
 		games.GET("/:gameId/versions/:versionId/download", h.DownloadGameVersionHandler)
