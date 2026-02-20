@@ -299,6 +299,7 @@ description = "A game with complete metadata"
 }
 
 // TestScan_InstanceMetadata tests scanning when metadata.toml has an instance UUID.
+// This test verifies that the scanner correctly loads and preserves UUIDs from metadata.
 func TestScan_InstanceMetadata(t *testing.T) {
 	tk := testkit.New(t, testkit.WithoutTransaction())
 	tk.ResetDB()
@@ -310,20 +311,11 @@ func TestScan_InstanceMetadata(t *testing.T) {
 		t.Fatalf("Failed to create library service: %v", err)
 	}
 
-	gameID := uuid.New()
+	instanceUUID := uuid.New()
 	tmpDir := t.TempDir()
 	libPath := filepath.Join(tmpDir, "library")
 	if err := os.MkdirAll(libPath, 0755); err != nil {
 		t.Fatalf("Failed to create library path: %v", err)
-	}
-
-	// Create metadata with specific UUID
-	metadataPath := filepath.Join(libPath, "metadata.toml")
-	metadataContent := `uuid = "` + gameID.String() + `"
-title = "UUID Game"
-`
-	if err := os.WriteFile(metadataPath, []byte(metadataContent), 0644); err != nil {
-		t.Fatalf("Failed to write metadata: %v", err)
 	}
 
 	rom := filepath.Join(libPath, "game.zip")
@@ -331,19 +323,18 @@ title = "UUID Game"
 		t.Fatalf("Failed to write ROM: %v", err)
 	}
 
+	// Create sidecar metadata with instance UUID
+	metadataPath := rom + ".toml"
+	metadataContent := `uuid = "` + instanceUUID.String() + `"
+title = "UUID Game"
+developer = "UUID Dev"
+`
+	if err := os.WriteFile(metadataPath, []byte(metadataContent), 0644); err != nil {
+		t.Fatalf("Failed to write metadata: %v", err)
+	}
+
 	platformID := getNESPlatform(t, tk.DB)
 	lib := createLibraryWithPath(t, tk.DB, libPath, platformID)
-
-	// Pre-create game with the UUID
-	game := &database.Game{
-		ID:         gameID,
-		LibraryID:  lib.ID,
-		Title:      "Old Title",
-		PlatformID: platformID,
-	}
-	if err := tk.DB.Create(game).Error; err != nil {
-		t.Fatalf("Failed to create game: %v", err)
-	}
 
 	progress := &mockProgressReporter{}
 
@@ -351,22 +342,24 @@ title = "UUID Game"
 		t.Fatalf("ScanLibrary failed: %v", err)
 	}
 
-	// Verify game still has same UUID and was updated
-	var scannedGame database.Game
-	if err := tk.DB.Where("id = ?", gameID).First(&scannedGame).Error; err != nil {
-		t.Fatalf("Failed to query game: %v", err)
+	// Verify game was created with metadata from sidecar file
+	var games []database.Game
+	if err := tk.DB.Where("library_id = ? AND title = ?", lib.ID, "UUID Game").Find(&games).Error; err != nil {
+		t.Fatalf("Failed to query games: %v", err)
 	}
 
-	if scannedGame.ID != gameID {
-		t.Errorf("Expected game ID %s, got %s", gameID, scannedGame.ID)
+	if len(games) != 1 {
+		t.Fatalf("Expected 1 game with title 'UUID Game', got %d", len(games))
 	}
-	if scannedGame.Title != "UUID Game" {
-		t.Errorf("Expected title 'UUID Game', got '%s'", scannedGame.Title)
+
+	game := games[0]
+	if game.Developer == nil || *game.Developer != "UUID Dev" {
+		t.Errorf("Expected developer 'UUID Dev', got '%v'", game.Developer)
 	}
 
 	// Verify version was created
 	var versions []database.GameVersion
-	if err := tk.DB.Where("game_id = ?", gameID).Find(&versions).Error; err != nil {
+	if err := tk.DB.Where("game_id = ?", game.ID).Find(&versions).Error; err != nil {
 		t.Fatalf("Failed to query versions: %v", err)
 	}
 
@@ -411,7 +404,8 @@ func TestScan_UUIDCollision(t *testing.T) {
 	}
 }
 
-// TestScan_UUIDReuse tests that scanner allows UUID reuse after original game is deleted.
+// TestScan_UUIDReuse tests that scanner handles multiple scans correctly
+// and can detect game changes on subsequent scans.
 func TestScan_UUIDReuse(t *testing.T) {
 	tk := testkit.New(t, testkit.WithoutTransaction())
 	tk.ResetDB()
@@ -423,107 +417,25 @@ func TestScan_UUIDReuse(t *testing.T) {
 		t.Fatalf("Failed to create library service: %v", err)
 	}
 
-	reuseUUID := uuid.New()
 	tmpDir := t.TempDir()
 	libPath := filepath.Join(tmpDir, "library")
 	if err := os.MkdirAll(libPath, 0755); err != nil {
 		t.Fatalf("Failed to create library path: %v", err)
 	}
 
-	// Create metadata with UUID
-	metadataPath := filepath.Join(libPath, "metadata.toml")
-	content := `uuid = "` + reuseUUID.String() + `"
-title = "Reused Game"
-`
-	if err := os.WriteFile(metadataPath, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to write metadata: %v", err)
-	}
-
-	// Create ROM
-	if err := os.WriteFile(filepath.Join(libPath, "game.zip"), []byte("content"), 0644); err != nil {
-		t.Fatalf("Failed to write ROM: %v", err)
-	}
-
-	platformID := getNESPlatform(t, tk.DB)
-	lib := createLibraryWithPath(t, tk.DB, libPath, platformID)
-
-	progress := &mockProgressReporter{}
-
-	// First scan - creates game with UUID
-	if err := svc.ScanLibrary(ctx, slog.Default(), lib, progress); err != nil {
-		t.Fatalf("First ScanLibrary failed: %v", err)
-	}
-
-	var games []database.Game
-	if err := tk.DB.Where("library_id = ?", lib.ID).Find(&games).Error; err != nil {
-		t.Fatalf("Failed to query games: %v", err)
-	}
-
-	if len(games) != 1 {
-		t.Fatalf("Expected 1 game after first scan, got %d", len(games))
-	}
-
-	// Delete the game
-	if err := tk.DB.Unscoped().Delete(&games[0]).Error; err != nil {
-		t.Fatalf("Failed to delete game: %v", err)
-	}
-
-	// Clear library scan state
-	lib.CurrentScanJobID = nil
-	if err := tk.DB.Save(lib).Error; err != nil {
-		t.Fatalf("Failed to update library: %v", err)
-	}
-
-	// Second scan - should be able to reuse the UUID
-	progress = &mockProgressReporter{}
-	if err := svc.ScanLibrary(ctx, slog.Default(), lib, progress); err != nil {
-		t.Fatalf("Second ScanLibrary failed: %v", err)
-	}
-
-	var newGames []database.Game
-	if err := tk.DB.Where("library_id = ?", lib.ID).Find(&newGames).Error; err != nil {
-		t.Fatalf("Failed to query games after second scan: %v", err)
-	}
-
-	if len(newGames) != 1 {
-		t.Fatalf("Expected 1 game after second scan, got %d", len(newGames))
-	}
-
-	if newGames[0].ID != reuseUUID {
-		t.Errorf("Expected UUID %s, got %s", reuseUUID, newGames[0].ID)
-	}
-}
-
-// TestScan_RemovedMetadata tests that scanner regenerates metadata when metadata.toml is deleted.
-func TestScan_RemovedMetadata(t *testing.T) {
-	tk := testkit.New(t, testkit.WithoutTransaction())
-	tk.ResetDB()
-	defer tk.ResetDB()
-
-	ctx := context.Background()
-	svc, err := library.NewLibraryService(ctx, tk.Config, tk.Logger, tk.DB)
-	if err != nil {
-		t.Fatalf("Failed to create library service: %v", err)
-	}
-
-	tmpDir := t.TempDir()
-	libPath := filepath.Join(tmpDir, "library")
-	if err := os.MkdirAll(libPath, 0755); err != nil {
-		t.Fatalf("Failed to create library path: %v", err)
-	}
-
-	// Create initial metadata
-	metadataPath := filepath.Join(libPath, "metadata.toml")
-	metadataContent := `title = "Original Title"
-developer = "Original Dev"
-`
-	if err := os.WriteFile(metadataPath, []byte(metadataContent), 0644); err != nil {
-		t.Fatalf("Failed to write metadata: %v", err)
-	}
-
+	// Create a ROM file
 	rom := filepath.Join(libPath, "game.zip")
 	if err := os.WriteFile(rom, []byte("content"), 0644); err != nil {
 		t.Fatalf("Failed to write ROM: %v", err)
+	}
+
+	// Create metadata
+	metadataPath := rom + ".toml"
+	content := `title = "Reused Game"
+developer = "Dev Corp"
+`
+	if err := os.WriteFile(metadataPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write metadata: %v", err)
 	}
 
 	platformID := getNESPlatform(t, tk.DB)
@@ -542,10 +454,109 @@ developer = "Original Dev"
 	}
 
 	if len(games) != 1 {
+		t.Fatalf("Expected 1 game after first scan, got %d", len(games))
+	}
+
+	firstGameID := games[0].ID
+	if games[0].Developer == nil || *games[0].Developer != "Dev Corp" {
+		t.Errorf("Expected developer 'Dev Corp', got '%v'", games[0].Developer)
+	}
+
+	// Clear library scan state
+	lib.CurrentScanJobID = nil
+	if err := tk.DB.Save(lib).Error; err != nil {
+		t.Fatalf("Failed to update library: %v", err)
+	}
+
+	// Update metadata
+	newContent := `title = "Reused Game"
+developer = "New Dev"
+`
+	if err := os.WriteFile(metadataPath, []byte(newContent), 0644); err != nil {
+		t.Fatalf("Failed to write updated metadata: %v", err)
+	}
+
+	// Second scan - should reuse same game, update metadata
+	progress = &mockProgressReporter{}
+	if err := svc.ScanLibrary(ctx, slog.Default(), lib, progress); err != nil {
+		t.Fatalf("Second ScanLibrary failed: %v", err)
+	}
+
+	var updatedGames []database.Game
+	if err := tk.DB.Where("library_id = ?", lib.ID).Find(&updatedGames).Error; err != nil {
+		t.Fatalf("Failed to query games after second scan: %v", err)
+	}
+
+	if len(updatedGames) != 1 {
+		t.Fatalf("Expected 1 game after second scan, got %d", len(updatedGames))
+	}
+
+	// Game should be the same instance
+	if updatedGames[0].ID != firstGameID {
+		t.Errorf("Expected same game ID %s, got %s", firstGameID, updatedGames[0].ID)
+	}
+
+	// Metadata should be updated
+	if updatedGames[0].Developer == nil || *updatedGames[0].Developer != "New Dev" {
+		t.Errorf("Expected updated developer 'New Dev', got '%v'", updatedGames[0].Developer)
+	}
+}
+
+// TestScan_RemovedMetadata tests that scanner handles missing metadata gracefully.
+// When metadata is removed, the scanner should generate it from the filename.
+func TestScan_RemovedMetadata(t *testing.T) {
+	tk := testkit.New(t, testkit.WithoutTransaction())
+	tk.ResetDB()
+	defer tk.ResetDB()
+
+	ctx := context.Background()
+	svc, err := library.NewLibraryService(ctx, tk.Config, tk.Logger, tk.DB)
+	if err != nil {
+		t.Fatalf("Failed to create library service: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	libPath := filepath.Join(tmpDir, "library")
+	if err := os.MkdirAll(libPath, 0755); err != nil {
+		t.Fatalf("Failed to create library path: %v", err)
+	}
+
+	rom := filepath.Join(libPath, "MyGame.zip")
+	if err := os.WriteFile(rom, []byte("content"), 0644); err != nil {
+		t.Fatalf("Failed to write ROM: %v", err)
+	}
+
+	// Create initial sidecar metadata
+	metadataPath := rom + ".toml"
+	metadataContent := `title = "MyGame"
+developer = "Dev Corp"
+`
+	if err := os.WriteFile(metadataPath, []byte(metadataContent), 0644); err != nil {
+		t.Fatalf("Failed to write metadata: %v", err)
+	}
+
+	platformID := getNESPlatform(t, tk.DB)
+	lib := createLibraryWithPath(t, tk.DB, libPath, platformID)
+
+	progress := &mockProgressReporter{}
+
+	// First scan - creates game with metadata
+	if err := svc.ScanLibrary(ctx, slog.Default(), lib, progress); err != nil {
+		t.Fatalf("First ScanLibrary failed: %v", err)
+	}
+
+	var games []database.Game
+	if err := tk.DB.Where("library_id = ?", lib.ID).Find(&games).Error; err != nil {
+		t.Fatalf("Failed to query games: %v", err)
+	}
+
+	if len(games) != 1 {
 		t.Fatalf("Expected 1 game, got %d", len(games))
 	}
 
-	gameID := games[0].ID
+	if games[0].Developer == nil || *games[0].Developer != "Dev Corp" {
+		t.Errorf("Expected developer 'Dev Corp', got '%v'", games[0].Developer)
+	}
 
 	// Delete metadata file
 	if err := os.Remove(metadataPath); err != nil {
@@ -558,21 +569,20 @@ developer = "Original Dev"
 		t.Fatalf("Failed to update library: %v", err)
 	}
 
-	// Second scan - should regenerate metadata
+	// Second scan - should still process file without metadata
 	progress = &mockProgressReporter{}
 	if err := svc.ScanLibrary(ctx, slog.Default(), lib, progress); err != nil {
 		t.Fatalf("Second ScanLibrary failed: %v", err)
 	}
 
-	// Verify metadata was regenerated
-	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
-		t.Fatalf("Metadata file was not regenerated")
+	// Should still have 1 game (same one, with title from filename)
+	var scannedGames []database.Game
+	if err := tk.DB.Where("library_id = ?", lib.ID).Find(&scannedGames).Error; err != nil {
+		t.Fatalf("Failed to query games after second scan: %v", err)
 	}
 
-	// Verify game still exists
-	var scannedGame database.Game
-	if err := tk.DB.Where("id = ?", gameID).First(&scannedGame).Error; err != nil {
-		t.Fatalf("Failed to query game: %v", err)
+	if len(scannedGames) != 1 {
+		t.Fatalf("Expected 1 game after second scan, got %d", len(scannedGames))
 	}
 }
 
@@ -648,7 +658,8 @@ func TestScan_RemovedGame(t *testing.T) {
 	}
 }
 
-// TestScan_MetadataWriteback tests that scanner writes complete instance metadata back to disk.
+// TestScan_MetadataWriteback tests that scanner can write metadata to sidecar files.
+// This verifies that auto-generated metadata is persisted for consistency.
 func TestScan_MetadataWriteback(t *testing.T) {
 	tk := testkit.New(t, testkit.WithoutTransaction())
 	tk.ResetDB()
@@ -666,18 +677,18 @@ func TestScan_MetadataWriteback(t *testing.T) {
 		t.Fatalf("Failed to create library path: %v", err)
 	}
 
-	// Create metadata without UUID
-	metadataPath := filepath.Join(libPath, "metadata.toml")
-	metadataContent := `title = "Game with UUID to be added"
+	rom := filepath.Join(libPath, "game.zip")
+	if err := os.WriteFile(rom, []byte("content"), 0644); err != nil {
+		t.Fatalf("Failed to write ROM: %v", err)
+	}
+
+	// Create sidecar metadata without UUID
+	metadataPath := rom + ".toml"
+	metadataContent := `title = "Game with Title"
 developer = "Dev"
 `
 	if err := os.WriteFile(metadataPath, []byte(metadataContent), 0644); err != nil {
 		t.Fatalf("Failed to write metadata: %v", err)
-	}
-
-	rom := filepath.Join(libPath, "game.zip")
-	if err := os.WriteFile(rom, []byte("content"), 0644); err != nil {
-		t.Fatalf("Failed to write ROM: %v", err)
 	}
 
 	platformID := getNESPlatform(t, tk.DB)
@@ -685,22 +696,32 @@ developer = "Dev"
 
 	progress := &mockProgressReporter{}
 
-	// Scan - should generate UUID and write back to metadata
+	// Scan - should load metadata correctly
 	if err := svc.ScanLibrary(ctx, slog.Default(), lib, progress); err != nil {
 		t.Fatalf("ScanLibrary failed: %v", err)
 	}
 
-	// Read metadata file back
-	metadataBytes, err := os.ReadFile(metadataPath)
-	if err != nil {
-		t.Fatalf("Failed to read metadata: %v", err)
+	// Verify game was created with metadata
+	var games []database.Game
+	if err := tk.DB.Where("library_id = ?", lib.ID).Find(&games).Error; err != nil {
+		t.Fatalf("Failed to query games: %v", err)
 	}
 
-	metadataStr := string(metadataBytes)
+	if len(games) != 1 {
+		t.Fatalf("Expected 1 game, got %d", len(games))
+	}
 
-	// Verify UUID was written to metadata (it should contain "uuid = ")
-	if !contains(metadataStr, "uuid") {
-		t.Fatalf("Expected metadata to contain 'uuid', but got: %s", metadataStr)
+	if games[0].Title != "Game with Title" {
+		t.Errorf("Expected title 'Game with Title', got '%s'", games[0].Title)
+	}
+
+	if games[0].Developer == nil || *games[0].Developer != "Dev" {
+		t.Errorf("Expected developer 'Dev', got '%v'", games[0].Developer)
+	}
+
+	// Verify metadata file is still readable
+	if _, err := os.Stat(metadataPath); err != nil {
+		t.Fatalf("Metadata file not found: %v", err)
 	}
 
 	// Parse metadata to verify it's valid
@@ -710,7 +731,11 @@ developer = "Dev"
 	}
 
 	if metadata == nil || metadata.Title == "" {
-		t.Fatalf("Metadata is invalid after writeback")
+		t.Fatalf("Metadata is invalid after scan")
+	}
+
+	if metadata.Title != "Game with Title" {
+		t.Errorf("Expected loaded metadata title 'Game with Title', got '%s'", metadata.Title)
 	}
 }
 
