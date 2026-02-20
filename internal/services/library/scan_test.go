@@ -252,7 +252,13 @@ func TestScan_FullGenericMetadata(t *testing.T) {
 		t.Fatalf("Failed to create library path: %v", err)
 	}
 
-	metadataPath := filepath.Join(libPath, "metadata.toml")
+	rom := filepath.Join(libPath, "game.zip")
+	if err := os.WriteFile(rom, []byte("content"), 0644); err != nil {
+		t.Fatalf("Failed to write ROM: %v", err)
+	}
+
+	// Create sidecar metadata file (game.zip.toml)
+	metadataPath := rom + ".toml"
 	metadataContent := `title = "Full Metadata Game"
 developer = "Dev Corp"
 publisher = "Pub Inc"
@@ -261,11 +267,6 @@ description = "A game with complete metadata"
 `
 	if err := os.WriteFile(metadataPath, []byte(metadataContent), 0644); err != nil {
 		t.Fatalf("Failed to write metadata: %v", err)
-	}
-
-	rom := filepath.Join(libPath, "game.zip")
-	if err := os.WriteFile(rom, []byte("content"), 0644); err != nil {
-		t.Fatalf("Failed to write ROM: %v", err)
 	}
 
 	platformID := getNESPlatform(t, tk.DB)
