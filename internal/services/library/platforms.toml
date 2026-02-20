@@ -1,0 +1,85 @@
+# Game Library Platforms Configuration
+#
+# This file defines the gaming platforms available in swopcart.
+# Admins can modify extensions per platform to customize file detection.
+#
+# Format:
+# [[platforms]]
+# name = "Platform Name"
+# description = "Description of the platform"
+# extensions = [".ext1", ".ext2", ".zip"]
+
+[[platforms]]
+name = "NES"
+description = "Nintendo Entertainment System"
+extensions = [".nes", ".rom", ".zip"]
+
+[[platforms]]
+name = "SNES"
+description = "Super Nintendo Entertainment System"
+extensions = [".sfc", ".smc", ".rom", ".zip"]
+
+[[platforms]]
+name = "N64"
+description = "Nintendo 64"
+extensions = [".z64", ".n64", ".rom", ".zip"]
+
+[[platforms]]
+name = "Game Boy"
+description = "Nintendo Game Boy"
+extensions = [".gb", ".rom", ".zip"]
+
+[[platforms]]
+name = "Game Boy Color"
+description = "Nintendo Game Boy Color"
+extensions = [".gbc", ".rom", ".zip"]
+
+[[platforms]]
+name = "Game Boy Advance"
+description = "Nintendo Game Boy Advance"
+extensions = [".gba", ".rom", ".zip"]
+
+[[platforms]]
+name = "Sega Genesis"
+description = "Sega Genesis / Mega Drive"
+extensions = [".gen", ".md", ".rom", ".zip"]
+
+[[platforms]]
+name = "Sega Game Gear"
+description = "Sega Game Gear"
+extensions = [".gg", ".rom", ".zip"]
+
+[[platforms]]
+name = "Sega Master System"
+description = "Sega Master System"
+extensions = [".sms", ".rom", ".zip"]
+
+[[platforms]]
+name = "Atari 2600"
+description = "Atari 2600"
+extensions = [".a26", ".bin", ".rom", ".zip"]
+
+[[platforms]]
+name = "PlayStation 1"
+description = "Sony PlayStation 1"
+extensions = [".iso", ".cue", ".bin", ".zip"]
+
+[[platforms]]
+name = "PlayStation 2"
+description = "Sony PlayStation 2"
+extensions = [".iso", ".bin", ".cue", ".zip"]
+
+[[platforms]]
+name = "Dreamcast"
+description = "Sega Dreamcast"
+extensions = [".iso", ".cdi", ".gdi", ".zip"]
+
+[[platforms]]
+name = "DOS"
+description = "MS-DOS"
+extensions = [".exe", ".com", ".bat", ".zip"]
+
+[[platforms]]
+name = "Windows"
+description = "Windows PC"
+extensions = [".exe", ".iso", ".zip"]

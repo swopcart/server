@@ -27,6 +27,11 @@ func NewLibraryService(
 	l *slog.Logger,
 	db *gorm.DB,
 ) (*LibraryService, error) {
+	// Ensure default platforms file exists
+	if err := ensureDefaultPlatformsFile(); err != nil {
+		return nil, fmt.Errorf("failed to ensure default platforms file: %w", err)
+	}
+
 	svc := &LibraryService{
 		context: ctx,
 		config:  cfg,
