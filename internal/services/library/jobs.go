@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -145,102 +146,36 @@ func (svc *LibraryService) scanLibrary(
 
 	progress.UpdateProgress(totalRecords, 0, "")
 
-	// Second pass: process files
+	// Second pass: process entries in library directories
+	// Process ONLY top-level entries (files or folders, not subdirectories)
 	for _, scanPath := range paths {
-		if err := filepath.Walk(scanPath, func(filePath string, info os.FileInfo, err error) error {
-			if err != nil {
-				logger.WarnContext(ctx, "error accessing path", "path", filePath, "error", err)
-				return nil
-			}
+		entries, err := os.ReadDir(scanPath)
+		if err != nil {
+			logger.WarnContext(ctx, "failed to read directory", "path", scanPath, "error", err)
+			continue
+		}
 
-			if info.IsDir() {
-				return nil
-			}
+		for _, entry := range entries {
+			entryPath := filepath.Join(scanPath, entry.Name())
 
-			// Check if file matches platform extensions
-			if !matchesExtension(filePath, extensions) {
-				return nil
-			}
-
-			foundFiles[filePath] = true
-
-			// Get directory name as game title
-			dirPath := filepath.Dir(filePath)
-			dirName := filepath.Base(dirPath)
-
-			// Extract metadata from filename
-			filename := filepath.Base(filePath)
-			metadata := svc.ExtractMetadataFromFilename(filename, platform.Name)
-
-			// Use extracted title if available, otherwise use directory name
-			if metadata.Title == "" {
-				metadata.Title = dirName
-			}
-
-			// Get or create game
-			game, err := svc.GetOrCreateGame(ctx, lib.ID, dirPath, metadata.Title)
-			if err != nil {
-				logger.ErrorContext(ctx, "failed to get/create game", "title", metadata.Title, "error", err)
-				return nil
-			}
-
-			// Calculate hashes for first scan only
-			var hashes *Hashes
-			var existingVersion database.GameVersion
-			if err := svc.db.WithContext(ctx).Where("file_path = ?", filePath).First(&existingVersion).Error; err == gorm.ErrRecordNotFound {
-				// New file, calculate hashes
-				hashes, err = svc.CalculateFileHashes(filePath)
-				if err != nil {
-					logger.WarnContext(ctx, "failed to calculate hashes", "file", filePath, "error", err)
-					hashes = &Hashes{} // Use empty hashes
+			if entry.IsDir() {
+				// Process folder: look for metadata.toml or binaries inside
+				if err := svc.processFolderGame(ctx, logger, lib.ID, entryPath, platform, extensions, foundFiles); err != nil {
+					logger.WarnContext(ctx, "failed to process folder game", "folder", entryPath, "error", err)
 				}
-			} else if err != nil {
-				logger.WarnContext(ctx, "error checking existing version", "file", filePath, "error", err)
-				hashes = &Hashes{}
+				processedRecords++
+				progress.UpdateProgress(totalRecords, processedRecords, entry.Name())
 			} else {
-				// File already exists in DB, use existing hashes
-				hashes = &Hashes{
-					MD5:    existingVersion.MD5,
-					SHA1:   existingVersion.SHA1,
-					SHA256: existingVersion.SHA256,
-					Blake3: existingVersion.Blake3,
+				// Process flat file: check for .meta or .toml sidecar
+				if matchesExtension(entryPath, extensions) {
+					if err := svc.processFlatGame(ctx, logger, lib.ID, entryPath, platform); err != nil {
+						logger.WarnContext(ctx, "failed to process flat game", "file", entryPath, "error", err)
+					}
+					foundFiles[entryPath] = true
+					processedRecords++
+					progress.UpdateProgress(totalRecords, processedRecords, entry.Name())
 				}
 			}
-
-			// Create/update game version
-			_, err = svc.UpsertGameVersion(ctx, game.ID, filePath, dirName, info.Size(), hashes.ToMap())
-			if err != nil {
-				logger.ErrorContext(ctx, "failed to upsert version", "file", filePath, "error", err)
-			}
-
-			// Save metadata to file if it doesn't exist
-			metadataPath := filePath + ".meta"
-			if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
-				if err := svc.SaveMetadataToFile(metadataPath, metadata); err != nil {
-					logger.WarnContext(ctx, "failed to save metadata file", "path", metadataPath, "error", err)
-				}
-			}
-
-			// Update game metadata if we extracted anything useful
-			if metadata.Developer != "" || metadata.Publisher != "" {
-				updates := make(map[string]interface{})
-				if metadata.Developer != "" {
-					updates["developer"] = metadata.Developer
-				}
-				if metadata.Publisher != "" {
-					updates["publisher"] = metadata.Publisher
-				}
-				if _, err := svc.UpdateGameMetadata(ctx, game.ID, updates); err != nil {
-					logger.WarnContext(ctx, "failed to update game metadata", "game", game.ID, "error", err)
-				}
-			}
-
-			processedRecords++
-			progress.UpdateProgress(totalRecords, processedRecords, filename)
-
-			return nil
-		}); err != nil {
-			logger.WarnContext(ctx, "error walking directory", "path", scanPath, "error", err)
 		}
 	}
 
@@ -271,6 +206,222 @@ func (svc *LibraryService) scanLibrary(
 	}
 
 	logger.InfoContext(ctx, "Library scan completed", "id", lib.ID, "total", processedRecords)
+	return nil
+}
+
+// processFolderGame processes a game folder with metadata.toml and ROM files inside
+func (svc *LibraryService) processFolderGame(
+	ctx context.Context,
+	logger *slog.Logger,
+	libraryID uuid.UUID,
+	folderPath string,
+	platform *database.Platform,
+	extensions []string,
+	foundFiles map[string]bool,
+) error {
+	// Try to load metadata.toml from folder
+	metadataPath := filepath.Join(folderPath, "metadata.toml")
+	metadata, err := svc.LoadMetadataFromFile(metadataPath)
+	if err != nil {
+		logger.WarnContext(ctx, "failed to load metadata.toml", "folder", folderPath, "error", err)
+		return nil // Skip folder if metadata can't be loaded
+	}
+
+	if metadata == nil {
+		// No metadata file, skip this folder
+		return nil
+	}
+
+	// Get or create game
+	game, err := svc.GetOrCreateGame(ctx, libraryID, folderPath, metadata.Title)
+	if err != nil {
+		return fmt.Errorf("failed to get/create game: %w", err)
+	}
+
+	// Process each version in metadata
+	for _, versionMeta := range metadata.Versions {
+		filePath := filepath.Join(folderPath, versionMeta.Filename)
+
+		// Verify file exists
+		info, err := os.Stat(filePath)
+		if err != nil {
+			logger.WarnContext(ctx, "version file not found", "file", filePath, "error", err)
+			continue
+		}
+
+		foundFiles[filePath] = true
+
+		// Calculate hashes
+		var hashes *Hashes
+		var existingVersion database.GameVersion
+		if err := svc.db.WithContext(ctx).Where("file_path = ?", filePath).First(&existingVersion).Error; err == gorm.ErrRecordNotFound {
+			// New file, calculate hashes
+			h, err := svc.CalculateFileHashes(filePath)
+			if err != nil {
+				logger.WarnContext(ctx, "failed to calculate hashes", "file", filePath, "error", err)
+				hashes = &Hashes{}
+			} else {
+				hashes = h
+			}
+		} else if err != nil {
+			logger.WarnContext(ctx, "error checking existing version", "file", filePath, "error", err)
+			hashes = &Hashes{}
+		} else {
+			hashes = &Hashes{
+				MD5:    existingVersion.MD5,
+				SHA1:   existingVersion.SHA1,
+				SHA256: existingVersion.SHA256,
+				Blake3: existingVersion.Blake3,
+			}
+		}
+
+		// Use metadata version name
+		versionName := versionMeta.Name
+		if versionName == "" {
+			// Fall back to filename without extension
+			versionName = filepath.Base(versionMeta.Filename)
+			if idx := strings.LastIndexByte(versionName, '.'); idx >= 0 {
+				versionName = versionName[:idx]
+			}
+		}
+
+		// Create/update version
+		_, err = svc.UpsertGameVersion(ctx, game.ID, filePath, versionName, info.Size(), hashes.ToMap())
+		if err != nil {
+			logger.ErrorContext(ctx, "failed to upsert version", "file", filePath, "error", err)
+		}
+	}
+
+	// Update game metadata from metadata.toml
+	updates := make(map[string]interface{})
+	if metadata.Developer != "" {
+		updates["developer"] = metadata.Developer
+	}
+	if metadata.Publisher != "" {
+		updates["publisher"] = metadata.Publisher
+	}
+	if metadata.ReleaseDate != "" {
+		updates["released_date"] = metadata.ReleaseDate
+	}
+	if metadata.Description != "" {
+		updates["description"] = metadata.Description
+	}
+
+	if len(updates) > 0 {
+		if _, err := svc.UpdateGameMetadata(ctx, game.ID, updates); err != nil {
+			logger.WarnContext(ctx, "failed to update game metadata", "game", game.ID, "error", err)
+		}
+	}
+
+	return nil
+}
+
+// processFlatGame processes a flat ROM file in a library directory
+func (svc *LibraryService) processFlatGame(
+	ctx context.Context,
+	logger *slog.Logger,
+	libraryID uuid.UUID,
+	filePath string,
+	platform *database.Platform,
+) error {
+	filename := filepath.Base(filePath)
+
+	// Try to load metadata sidecar (metadata.toml or .meta.toml)
+	metadataPath := filePath + ".toml"
+	metadata, err := svc.LoadMetadataFromFile(metadataPath)
+	if err != nil {
+		logger.WarnContext(ctx, "failed to load metadata sidecar", "file", filePath, "error", err)
+		// Fall back to generating metadata from filename
+		metadata = svc.ExtractMetadataFromFilename(filename, platform.Name)
+	}
+
+	if metadata == nil || metadata.Title == "" {
+		// Generate metadata from filename
+		metadata = svc.ExtractMetadataFromFilename(filename, platform.Name)
+	}
+
+	// Get or create game
+	game, err := svc.GetOrCreateGame(ctx, libraryID, filepath.Dir(filePath), metadata.Title)
+	if err != nil {
+		return fmt.Errorf("failed to get/create game: %w", err)
+	}
+
+	// Calculate hashes
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	var hashes *Hashes
+	var existingVersion database.GameVersion
+	if err := svc.db.WithContext(ctx).Where("file_path = ?", filePath).First(&existingVersion).Error; err == gorm.ErrRecordNotFound {
+		// New file, calculate hashes
+		h, err := svc.CalculateFileHashes(filePath)
+		if err != nil {
+			logger.WarnContext(ctx, "failed to calculate hashes", "file", filePath, "error", err)
+			hashes = &Hashes{}
+		} else {
+			hashes = h
+		}
+	} else if err != nil {
+		logger.WarnContext(ctx, "error checking existing version", "file", filePath, "error", err)
+		hashes = &Hashes{}
+	} else {
+		hashes = &Hashes{
+			MD5:    existingVersion.MD5,
+			SHA1:   existingVersion.SHA1,
+			SHA256: existingVersion.SHA256,
+			Blake3: existingVersion.Blake3,
+		}
+	}
+
+	// Use metadata version name if available, otherwise use filename without extension
+	versionName := ""
+	if len(metadata.Versions) > 0 {
+		// Get first version's name
+		for _, v := range metadata.Versions {
+			versionName = v.Name
+			break
+		}
+	}
+	if versionName == "" {
+		versionName = filename[:len(filename)-len(filepath.Ext(filename))]
+	}
+
+	// Create/update version
+	_, err = svc.UpsertGameVersion(ctx, game.ID, filePath, versionName, info.Size(), hashes.ToMap())
+	if err != nil {
+		logger.ErrorContext(ctx, "failed to upsert version", "file", filePath, "error", err)
+	}
+
+	// Update game metadata if available
+	updates := make(map[string]interface{})
+	if metadata.Developer != "" {
+		updates["developer"] = metadata.Developer
+	}
+	if metadata.Publisher != "" {
+		updates["publisher"] = metadata.Publisher
+	}
+	if metadata.ReleaseDate != "" {
+		updates["released_date"] = metadata.ReleaseDate
+	}
+	if metadata.Description != "" {
+		updates["description"] = metadata.Description
+	}
+
+	if len(updates) > 0 {
+		if _, err := svc.UpdateGameMetadata(ctx, game.ID, updates); err != nil {
+			logger.WarnContext(ctx, "failed to update game metadata", "game", game.ID, "error", err)
+		}
+	}
+
+	// Save metadata sidecar if it doesn't exist
+	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
+		if err := svc.SaveMetadataToFile(metadataPath, metadata); err != nil {
+			logger.WarnContext(ctx, "failed to save metadata sidecar", "path", metadataPath, "error", err)
+		}
+	}
+
 	return nil
 }
 
