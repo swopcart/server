@@ -116,7 +116,26 @@ func (svc *LibraryService) reimportLibrary(
 	lib *database.Library,
 	progress jobs.ProgressReporter,
 ) error {
-	// Delete all games (and their versions via cascade) from this library
+	// Get all game IDs for this library first
+	var gameIDs []uuid.UUID
+	if err := svc.db.WithContext(ctx).
+		Model(&database.Game{}).
+		Where("library_id = ?", lib.ID).
+		Pluck("id", &gameIDs).Error; err != nil {
+		return fmt.Errorf("failed to fetch game IDs: %w", err)
+	}
+
+	// Delete game versions first (foreign key constraint)
+	if len(gameIDs) > 0 {
+		if err := svc.db.WithContext(ctx).
+			Where("game_id IN ?", gameIDs).
+			Unscoped(). // Hard delete - bypass soft delete
+			Delete(&database.GameVersion{}).Error; err != nil {
+			return fmt.Errorf("failed to delete game versions: %w", err)
+		}
+	}
+
+	// Now delete games from this library
 	// Using hard delete (not soft delete) to completely clear the library
 	if err := svc.db.WithContext(ctx).
 		Where("library_id = ?", lib.ID).
