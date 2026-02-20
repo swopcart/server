@@ -30,9 +30,18 @@ func (svc *LibraryService) RegisterJobs(jobSvc *jobs.JobService) error {
 				"libraries": "*",
 			}),
 		),
-		jobSvc.RegisterHandler(
+		jobSvc.RegisterScheduledJob(
+			svc.context,
 			"library.reimport",
+			"Delete all games and reimport from library directories (manual only)",
+			"0 0 0 32 * *", // Never runs (32nd day of month doesn't exist)
 			svc.libraryReimportJob,
+			jobs.WithPriority(5),
+			jobs.WithQueue("default"),
+			jobs.WithEnabled(false), // Disabled by default, triggered manually
+			jobs.WithDefaultParameters(jobs.Params{
+				"libraries": "*",
+			}),
 		),
 	}
 
