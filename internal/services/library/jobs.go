@@ -34,7 +34,7 @@ func (svc *LibraryService) RegisterJobs(jobSvc *jobs.JobService) error {
 			svc.context,
 			"library.reimport",
 			"Delete all games and reimport from library directories (manual only)",
-			"0 0 0 32 * *", // Never runs (32nd day of month doesn't exist)
+			"0 0 0 31 2 *", // Never runs (Feb 31st doesn't exist)
 			svc.libraryReimportJob,
 			jobs.WithPriority(5),
 			jobs.WithQueue("default"),
