@@ -1,0 +1,38 @@
+services:
+  swopcart:
+    image: ghcr.io/swopcart/server:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - swopcart_data:/data
+    environment:
+      SWOPCART_DB_CONN: postgres://swopcart:swopcart@db:5432/swopcart
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/api/v0/ping >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: swopcart
+      POSTGRES_USER: swopcart
+      POSTGRES_PASSWORD: swopcart
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swopcart"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  swopcart_data:
+  db_data:
