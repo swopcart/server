@@ -738,13 +738,3 @@ developer = "Dev"
 		t.Errorf("Expected loaded metadata title 'Game with Title', got '%s'", metadata.Title)
 	}
 }
-
-// contains checks if string contains substring
-func contains(s, substr string) bool {
-	for i := 0; i < len(s)-len(substr)+1; i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

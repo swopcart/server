@@ -1,6 +1,7 @@
 package library
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -26,7 +27,7 @@ func (svc *LibraryService) CalculateFileHashes(filePath string) (*Hashes, error)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			svc.logger.WarnContext(nil, "failed to close file", "path", filePath, "error", err)
+			svc.logger.WarnContext(context.TODO(), "failed to close file", "path", filePath, "error", err)
 		}
 	}()
 
