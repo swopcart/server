@@ -73,6 +73,24 @@ const (
 	ErrCodeHandlerNotFound   = "HandlerNotFound"
 )
 
+// Error codes - Library management
+const (
+	ErrCodeLibraryNotFound       = "LibraryNotFound"
+	ErrCodeLibraryAlreadyExists  = "LibraryAlreadyExists"
+	ErrCodePlatformNotFound      = "PlatformNotFound"
+	ErrCodeInvalidLibraryPath    = "InvalidLibraryPath"
+	ErrCodePathNotFound          = "PathNotFound"
+	ErrCodePathNotDirectory      = "PathNotDirectory"
+	ErrCodeScanAlreadyInProgress = "ScanAlreadyInProgress"
+)
+
+// Error codes - Game management
+const (
+	ErrCodeGameNotFound       = "GameNotFound"
+	ErrCodeVersionNotFound    = "VersionNotFound"
+	ErrCodeCannotDownloadGame = "CannotDownloadGame"
+)
+
 // respondError sends a single error response
 func respondError(c *gin.Context, status int, code, message string) {
 	c.JSON(status, ErrorResponse{

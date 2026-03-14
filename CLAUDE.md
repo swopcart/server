@@ -14,23 +14,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run acceptably on low-power hardware (ARM64 NAS with 1GB RAM)
 
 ### Current Status
-Foundation complete: authentication, user management, session handling, background jobs system. Ready to build core game library features.
+Game library feature complete: platforms, libraries, scanning, metadata, downloads, and frontend browser UI all implemented.
 
 ## Active Development
 
-### Recently Completed (2026-02-03)
-- **Background job service**: ✓ Complete
-  - Cron-based scheduler with worker pools and queue management
-  - Admin UI for job management, triggering, and monitoring
-  - Progress tracking for long-running tasks
-  - Database cleanup maintenance job implemented as first example
+### Recently Completed (2026-02-20)
+- **Game library service**: ✓ Complete
+  - Platform config (embedded `platforms.toml`, auto-seeded on first run)
+  - Library management (create/update/delete with multi-path support)
+  - Directory-based and flat-file ROM scanner with sidecar metadata
+  - External ID markers in filenames (e.g. `[igdb=123]`)
+  - Streaming hash calculation (MD5, SHA1, SHA256) via `io.MultiWriter`
+  - Concurrent scan prevention via `Library.CurrentScanJobID`
+  - Library reimport job (hard-delete + rescan)
+  - Full game browser frontend with search, filters, and download
 
 ### Next Steps
-- Game library domain model (Platforms, Games, ROM files, User libraries)
-- ROM file scanning and identification (hash-based lookups)
-- Metadata scraping/integration (IGDB or similar)
+- ROM identification via hash lookups (IGDB or similar)
 - Save file sync system with conflict resolution
-- Client download/streaming endpoints
+- User-specific game libraries / access control
 
 ### Design Decisions
 - **Performance target**: Must run on ARM64 NAS with 1GB RAM
@@ -142,12 +144,13 @@ func TestInternalHandlerMap(t *testing.T) {
 ### Backend Structure
 - **cmd/swopcartd/**: Application entry point, bootstraps config → database → services → server
 - **internal/config/**: TOML config loading with environment variable support (`SWOPCART_DATA` for data directory)
-- **internal/database/**: GORM-based PostgreSQL layer with auto-migrations; models: User, Session, Job, JobExecution
+- **internal/database/**: GORM-based PostgreSQL layer with auto-migrations; models: User, Session, Job, JobExecution, Platform, Library, Game, GameVersion
 - **internal/services/**: Business logic layer with service container pattern
   - **identity/**: User identity management (no dependencies)
   - **session/**: Session and JWT token management (depends on identity)
   - **jobs/**: Background job scheduler and worker pools (depends on database)
   - **cleanup/**: Database cleanup tasks (depends on jobs)
+  - **library/**: Game library management, scanning, and metadata (depends on jobs)
 - **internal/www/**: Gin HTTP server and routing
 - **internal/www/api/v0/**: Versioned API handlers with auth middleware
 - **internal/testkit/**: Test harness with transaction-based isolation
@@ -206,7 +209,7 @@ func TestInternalHandlerMap(t *testing.T) {
 ### Background Jobs System
 - **Architecture**: Cron scheduler + worker pools + queue-based task execution
 - **Database models**: `Job` (metadata, schedule, config) and `JobExecution` (execution history, progress tracking)
-- **Job registration**: `RegisterScheduledJob()` for cron-based jobs, `RegisterHandler()` for on-demand jobs
+- **Job registration**: `RegisterScheduledJob()` for cron-based jobs, `RegisterOnDemandJob()` for manual-only jobs (no schedule), `RegisterHandler()` for low-level handler registration
 - **Functional options pattern**: Configure jobs with `WithPriority()`, `WithQueue()`, `WithEnabled()`, `WithDefaultParameters()`
 - **Worker pools**: Per-queue pools with configurable worker count (defaults to CPU count), 100-item buffered task queue
 - **Scheduler**: robfig/cron/v3 with 6-field cron expressions (second precision)
@@ -236,6 +239,58 @@ jobSvc.RegisterScheduledJob(
 ```go
 executionUUID, err := jobSvc.EnqueueJob(ctx, "example.daily_task",
     jobs.WithParameters(map[string]string{"override": "value"}))
+```
+
+### Game Library Service
+
+**Models and relationships**: `Platform` → `Library` (FK) → `Game` (FK) → `GameVersion`. Libraries have `Paths []string` (stored as JSON) for multi-directory support. Soft-delete on Library and Game; GameVersion hard-deleted on reimport.
+
+**Scanner design** (`scan.go`): Two-pass approach — first pass counts files for progress reporting, second pass processes only top-level entries in each scan path:
+- **Folder-based games**: Directory = one game. Reads `{dir}/metadata.toml` if present; auto-generates and saves it if missing.
+- **Flat ROM files**: Single file = one game. Reads `{file}.toml` sidecar if present; auto-generates and saves it if missing.
+
+**Filename metadata extraction**: Parses common ROM naming conventions from filenames/folder names:
+- External IDs: `[igdb=123]`, `[vgdb=456]` → stored in `ExternalIDs` map
+- Regions: `[USA]`, `[EUR]`, `[JPN]`, `.ntsc-u`, `.pal` etc.
+- Tags: `(Demo)`, `(Beta)`, `(v1.0)`, `(Rev A)`
+
+**Metadata duality**: Two representations with a conversion layer:
+- **TOML on disk**: kebab-case (`release-date`, `external-ids`). Folder games use `{dir}/metadata.toml`; flat games use `{file}.toml` sidecar.
+- **API JSON**: camelCase (`releaseDate`, `externalIds`). `MetadataToJSON()` / `JSONToMetadata()` convert between them.
+- `GameVersion.MetadataJSON` stores the JSON string in the database for efficient API responses.
+
+**Embedded config files pattern** (`embedded.go`): Use `//go:embed filename` to bundle default config into the binary. On service init, write to disk only if missing — allows user customization without rebuild. Example: `platforms.toml` written to `{dataDir}/platforms.toml` on first run.
+
+**Streaming hashes**: Uses `io.MultiWriter` to compute MD5, SHA1, SHA256 in a single file pass — avoids loading ROM files into memory (critical for ARM NAS target). Hashes stored on `GameVersion`; reused on rescans if file path unchanged.
+
+**Concurrent scan prevention**: `Library.CurrentScanJobID` (nullable UUID) set at scan start, cleared via `defer` at completion. API returns 409 if already set.
+
+**Scan cleanup (soft-delete)**: After scanning, builds a `foundFiles` set of all discovered `FilePath` values, then soft-deletes any existing `Game` whose versions are all absent from that set.
+
+**Library reimport**: Hard-deletes all `GameVersion` then all `Game` records for the library (bypasses soft-delete), then runs a full scan. Implemented as a separate `RegisterOnDemandJob`.
+
+**API endpoints**:
+```
+GET/POST       /api/v0/libraries                              # List/create (admin)
+GET/PATCH/DELETE /api/v0/libraries/{id}                      # CRUD (admin)
+POST           /api/v0/libraries/{id}/scan                   # Trigger scan (admin)
+POST           /api/v0/libraries/{id}/reimport               # Trigger reimport (admin)
+GET            /api/v0/platforms                             # List platforms (auth)
+GET            /api/v0/games                                 # Search all games (auth)
+GET            /api/v0/games/by-library/{libraryId}          # Filter by library (auth)
+GET            /api/v0/games/{id}                            # Game with versions (auth)
+GET            /api/v0/games/{id}/versions/{vId}/download    # Stream ROM file (auth)
+PATCH          /api/v0/games/{id}                            # Update metadata (admin)
+```
+Search endpoints support `q` (ILIKE title), `offset`, `limit` (default 50, max 100), `platformId` query params.
+
+**Scan/reimport response**: `{"executionId": "uuid", "status": "pending"}` — client polls jobs API for progress.
+
+**Test fixture pattern**: Scan tests copy fixture directories from `testdata/` to `t.TempDir()` for isolation, then create a `Library` record pointing to the temp path. Uses `testkit.WithoutTransaction()` + `tk.ResetDB()` because scanning involves background state. Fixture layouts:
+```
+testdata/flat_files/       game.zip + game.zip.toml sidecars
+testdata/folder_based/     GameName/metadata.toml + rom files
+testdata/mixed/            both types in one directory
 ```
 
 ## Tech Stack

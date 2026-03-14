@@ -26,10 +26,10 @@ export function SettingsPage() {
         onClick={() => navigate("/settings/users")}
       />
       <ListItem
-        title="Manage library"
+        title="Manage libraries"
         leading={<LucideLibraryBig />}
         trailing={<LucideChevronRight />}
-        onClick={() => navigate("/settings/library")}
+        onClick={() => navigate("/settings/libraries")}
       />
       <ListItem
         title="Background jobs"

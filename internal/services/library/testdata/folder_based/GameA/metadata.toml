@@ -1,0 +1,15 @@
+title = "Folder Game A"
+developer = "Dev A"
+publisher = "Pub A"
+releaseDate = "2020-01-15"
+description = "A game in a folder"
+
+[[versions]]
+name = "USA"
+filename = "game_usa.zip"
+regions = ["NTSC-U", "USA"]
+
+[[versions]]
+name = "EU"
+filename = "game_eu.zip"
+regions = ["PAL", "EUR"]

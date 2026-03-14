@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -45,7 +44,7 @@ func main() {
 	}
 
 	// Register jobs from all services
-	if err := registerJobs(svc); err != nil {
+	if err := svc.RegisterJobs(); err != nil {
 		slog.Error("Failed to register jobs", "err", err)
 		os.Exit(1)
 	}
@@ -70,16 +69,6 @@ func main() {
 	}
 
 	_ = server.Shutdown()
-}
-
-// registerJobs calls RegisterJobs on each service that implements it
-func registerJobs(svc *services.Services) error {
-	// Register cleanup jobs
-	if err := svc.Cleanup.RegisterJobs(svc.Jobs); err != nil {
-		return fmt.Errorf("failed to register cleanup jobs: %w", err)
-	}
-
-	return nil
 }
 
 func loadConfig() (config.Config, error) {

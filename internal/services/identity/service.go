@@ -4,9 +4,11 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"github.com/swopcart/server/internal/config"
 	"github.com/swopcart/server/internal/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IdentityService struct {
@@ -56,14 +58,31 @@ func (svc *IdentityService) ensureAdminExists(ctx context.Context) error {
 	svc.logger.Info("No users found, creating default admin account",
 		"username", DefaultAdminUsername)
 
-	_, err = svc.CreateUser(ctx, DefaultAdminUsername, DefaultAdminPassword, true)
+	passwordHash, err := hashPassword(DefaultAdminPassword)
 	if err != nil {
-		svc.logger.Error("Failed to create default admin account", "err", err)
 		return err
 	}
 
-	svc.logger.Warn("Default admin account created - please change the password immediately",
-		"username", DefaultAdminUsername)
+	user := database.User{
+		UUID:     uuid.New(),
+		Username: DefaultAdminUsername,
+		Password: passwordHash,
+		Admin:    true,
+	}
+
+	// Use ON CONFLICT DO NOTHING so a concurrent insert never aborts the transaction.
+	result := svc.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&user)
+	if result.Error != nil {
+		svc.logger.Error("Failed to create default admin account", "err", result.Error)
+		return result.Error
+	}
+
+	if result.RowsAffected > 0 {
+		svc.logger.Warn("Default admin account created - please change the password immediately",
+			"username", DefaultAdminUsername)
+	}
 
 	return nil
 }

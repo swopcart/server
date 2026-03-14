@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -124,11 +125,30 @@ func New(t *testing.T, opts ...HarnessOption) *Harness {
 
 		dbConn = tx
 	} else {
-		// No transaction - tests must manually clean up data
+		// No transaction - tests must manually clean up data.
+		// Acquire a session advisory lock so that only one WithoutTransaction test
+		// runs at a time across all packages. This prevents ResetDB (TRUNCATE) calls
+		// in one package from deleting committed data that another package's concurrent
+		// test depends on.
+		sqlDB, err := db.DB()
+		if err != nil {
+			t.Fatalf("failed to get sql.DB for advisory lock: %v", err)
+		}
+		lockConn, err := sqlDB.Conn(context.Background())
+		if err != nil {
+			t.Fatalf("failed to open advisory lock connection: %v", err)
+		}
+		if _, err := lockConn.ExecContext(context.Background(), "SELECT pg_advisory_lock(1234567890)"); err != nil {
+			_ = lockConn.Close()
+			t.Fatalf("failed to acquire test exclusion lock: %v", err)
+		}
+
 		t.Cleanup(func() {
-			sqlDB, _ := db.DB()
-			if sqlDB != nil {
-				_ = sqlDB.Close()
+			_, _ = lockConn.ExecContext(context.Background(), "SELECT pg_advisory_unlock(1234567890)")
+			_ = lockConn.Close()
+			sqlDB2, _ := db.DB()
+			if sqlDB2 != nil {
+				_ = sqlDB2.Close()
 			}
 		})
 
@@ -195,16 +215,23 @@ func (h *Harness) DELETE(path string) *httptest.ResponseRecorder {
 func (h *Harness) ResetDB() {
 	h.T.Helper()
 
-	// Delete in order respecting foreign keys
-	// JobExecution -> Job, Session -> User
-	tables := []string{
-		"job_executions",
-		"jobs",
-		"sessions",
-		"users",
-	}
+	models := func() (m []any) {
+		m = slices.Clone(database.Models)
+		slices.Reverse(m)
+		return
+	}()
 
-	for _, table := range tables {
+	for _, model := range models {
+		table := func() string {
+			stmt := &gorm.Statement{DB: h.DB}
+			if err := stmt.Parse(model); err != nil {
+				h.T.Logf("can't get table name: %v", err)
+				h.T.FailNow()
+			}
+
+			return stmt.Schema.Table
+		}()
+
 		if err := h.DB.Exec("TRUNCATE TABLE " + table + " RESTART IDENTITY CASCADE").Error; err != nil {
 			h.T.Fatalf("failed to truncate table %s: %v", table, err)
 		}

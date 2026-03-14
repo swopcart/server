@@ -7,6 +7,18 @@ import (
 	"gorm.io/gorm"
 )
 
+// The models
+var Models = []any{
+	&User{},
+	&Session{},
+	&Job{},
+	&JobExecution{},
+	&Platform{},
+	&Library{},
+	&Game{},
+	&GameVersion{},
+}
+
 type User struct {
 	gorm.Model
 
@@ -89,4 +101,82 @@ type JobExecution struct {
 	RecordsComplete int     `json:"recordsComplete"`
 	RecordsTotal    int     `json:"recordsTotal"`
 	CurrentRecord   *string `gorm:"type:text" json:"currentRecord"`
+}
+
+// Platform represents a gaming platform (NES, SNES, DOS, etc.)
+type Platform struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	Name        string  `gorm:"uniqueIndex" json:"name"` // "NES", "SNES", etc.
+	Description string  `json:"description"`
+	Extensions  *string `gorm:"type:text" json:"extensions"` // JSON array of extensions: [".nes", ".rom"]
+}
+
+// Library represents a game library (collection of games from a platform in specific directories)
+type Library struct {
+	ID        uuid.UUID `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt
+
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	PlatformID  uint     `json:"platformId"`
+	Platform    Platform `gorm:"foreignKey:PlatformID" json:"-"`
+
+	// JSON array of directory paths: ["/mnt/games/nes", "/data/roms"]
+	Paths *string `gorm:"type:text" json:"paths"`
+
+	// Scan status tracking
+	LastScannedAt    *time.Time `json:"lastScannedAt"`
+	ScanStatus       string     `gorm:"default:'idle'" json:"scanStatus"` // "idle", "scanning", "error"
+	LastScanError    *string    `json:"lastScanError"`
+	CurrentScanJobID *uuid.UUID `json:"currentScanJobId"` // Track active scan to prevent concurrent scans
+}
+
+// Game represents a game title (one per directory or flat file)
+type Game struct {
+	ID        uuid.UUID `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	DeletedAt gorm.DeletedAt
+
+	LibraryID  uuid.UUID `gorm:"index" json:"libraryId"`
+	Library    Library   `gorm:"foreignKey:LibraryID" json:"-"`
+	PlatformID uint      `json:"platformId"`
+	Platform   Platform  `gorm:"foreignKey:PlatformID" json:"-"`
+
+	Title        string     `gorm:"index" json:"title"` // Clean title from filename
+	Developer    *string    `json:"developer"`
+	Publisher    *string    `json:"publisher"`
+	ReleasedDate *time.Time `json:"releasedDate"`
+	Description  *string    `json:"description"`
+
+	Versions []GameVersion `gorm:"foreignKey:GameID" json:"versions,omitempty"`
+}
+
+// GameVersion represents a specific version/variant of a game
+type GameVersion struct {
+	ID        uuid.UUID `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	GameID      uuid.UUID `gorm:"index" json:"gameId"`
+	Game        Game      `gorm:"foreignKey:GameID" json:"-"`
+	VersionName string    `json:"versionName"`                 // "1.0", "PAL", "NTSC", "Demo", etc.
+	FilePath    string    `gorm:"uniqueIndex" json:"filePath"` // Full path to file
+	FileSize    int64     `json:"fileSize"`
+
+	// Hashes calculated on first scan only
+	MD5    string `json:"md5"`    // 32 hex chars
+	SHA1   string `json:"sha1"`   // 40 hex chars
+	SHA256 string `json:"sha256"` // 64 hex chars
+	Blake3 string `json:"blake3"` // 64 hex chars
+
+	MetadataPath string `json:"metadataPath"` // Path to .meta file
+
+	// JSON representation of TOML metadata for API responses
+	MetadataJSON *string `gorm:"type:text" json:"metadataJson"`
 }

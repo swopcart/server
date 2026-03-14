@@ -4,6 +4,7 @@ import { ThemeProvider } from "./components/theme-provider";
 import { LoginPage } from "./pages/login";
 import { HomePage } from "./pages/home";
 import { LibraryPage } from "./pages/library";
+import { GameDetailsPage } from "./pages/game-details";
 import { MyGamesPage } from "./pages/my-games";
 import { SettingsPage } from "./pages/settings";
 import { AccountPage } from "./pages/account";
@@ -13,6 +14,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { ManageUsersPage } from "./pages/settings/manage-users";
 import { ManageUserPage } from "./pages/settings/manage-user";
 import { JobsPage } from "./pages/settings/jobs";
+import { LibrariesPage } from "./pages/settings/libraries";
 import { AccountSessionsPage } from "./pages/account/sessions";
 
 function AuthenticatedLayout() {
@@ -23,6 +25,7 @@ function AuthenticatedLayout() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/library" element={<LibraryPage />} />
+          <Route path="/game/:gameId" element={<GameDetailsPage />} />
           <Route path="/my-games" element={<MyGamesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/users" element={<ManageUsersPage />} />
@@ -31,6 +34,7 @@ function AuthenticatedLayout() {
             element={<ManageUserPage />}
           />
           <Route path="/settings/jobs" element={<JobsPage />} />
+          <Route path="/settings/libraries" element={<LibrariesPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/account/sessions" element={<AccountSessionsPage />} />
         </Routes>
