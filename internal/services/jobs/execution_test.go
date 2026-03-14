@@ -12,6 +12,7 @@ import (
 	"github.com/swopcart/server/internal/database"
 	"github.com/swopcart/server/internal/services/jobs"
 	"github.com/swopcart/server/internal/testkit"
+	"gorm.io/gorm"
 )
 
 func TestJobExecutionWithDeterminateProgress(t *testing.T) {
@@ -41,15 +42,7 @@ func TestJobExecutionWithDeterminateProgress(t *testing.T) {
 		t.Fatalf("Failed to enqueue job: %v", err)
 	}
 
-	// Wait for execution to complete
-	time.Sleep(500 * time.Millisecond)
-
-	// Verify execution record
-	var execution database.JobExecution
-	err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
-	if err != nil {
-		t.Fatalf("Failed to find execution: %v", err)
-	}
+	execution := waitForExecution(t, tk.DB, executionUUID, 5*time.Second)
 
 	if execution.Status != "completed" {
 		t.Errorf("Expected status 'completed', got %s", execution.Status)
@@ -90,13 +83,7 @@ func TestJobExecutionWithIndeterminateProgress(t *testing.T) {
 		t.Fatalf("Failed to enqueue job: %v", err)
 	}
 
-	time.Sleep(200 * time.Millisecond)
-
-	var execution database.JobExecution
-	err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
-	if err != nil {
-		t.Fatalf("Failed to find execution: %v", err)
-	}
+	execution := waitForExecution(t, tk.DB, executionUUID, 5*time.Second)
 
 	if execution.Status != "completed" {
 		t.Errorf("Expected status 'completed', got %s", execution.Status)
@@ -129,12 +116,21 @@ func TestJobExecutionWithError(t *testing.T) {
 		t.Fatalf("Failed to enqueue job: %v", err)
 	}
 
-	time.Sleep(200 * time.Millisecond)
-
+	deadline := time.Now().Add(5 * time.Second)
 	var execution database.JobExecution
-	err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
-	if err != nil {
-		t.Fatalf("Failed to find execution: %v", err)
+	for time.Now().Before(deadline) {
+		err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		if err != nil {
+			t.Fatalf("Failed to find execution: %v", err)
+		}
+		if execution.Status == "failed" || execution.Status == "completed" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	if execution.Status != "failed" {
@@ -183,11 +179,7 @@ func TestJobExecutionWithParameters(t *testing.T) {
 		t.Fatal("Job did not execute")
 	}
 
-	var execution database.JobExecution
-	err = tk.DB.Where("uuid = ?", executionUUID).First(&execution).Error
-	if err != nil {
-		t.Fatalf("Failed to find execution: %v", err)
-	}
+	execution := waitForExecution(t, tk.DB, executionUUID, 5*time.Second)
 
 	// Parameters are stored in the database - we can verify by checking the execution record exists
 	// The actual parameter deserialization is an implementation detail
@@ -234,4 +226,28 @@ func TestScheduledJobExecution(t *testing.T) {
 			t.Fatalf("Timeout waiting for scheduled executions (got %d)", executionCount)
 		}
 	}
+}
+
+// waitForExecution polls until the execution reaches a terminal status or the timeout expires.
+// Treats record-not-found as transient to tolerate brief cross-package ResetDB interference.
+func waitForExecution(t *testing.T, db *gorm.DB, executionUUID interface{}, timeout time.Duration) database.JobExecution {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		var execution database.JobExecution
+		err := db.Where("uuid = ?", executionUUID).First(&execution).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		if err != nil {
+			t.Fatalf("Failed to query execution: %v", err)
+		}
+		if execution.Status == "completed" || execution.Status == "failed" {
+			return execution
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("Execution did not complete within %v", timeout)
+	return database.JobExecution{}
 }

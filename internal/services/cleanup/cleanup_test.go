@@ -2,6 +2,7 @@ package cleanup_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -185,6 +186,10 @@ func waitForJobCompletion(t *testing.T, db *gorm.DB, executionUUID uuid.UUID, ti
 	for time.Now().Before(deadline) {
 		var execution database.JobExecution
 		err := db.Where("uuid = ?", executionUUID).First(&execution).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		if err != nil {
 			t.Fatalf("Failed to find execution: %v", err)
 		}

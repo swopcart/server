@@ -125,11 +125,30 @@ func New(t *testing.T, opts ...HarnessOption) *Harness {
 
 		dbConn = tx
 	} else {
-		// No transaction - tests must manually clean up data
+		// No transaction - tests must manually clean up data.
+		// Acquire a session advisory lock so that only one WithoutTransaction test
+		// runs at a time across all packages. This prevents ResetDB (TRUNCATE) calls
+		// in one package from deleting committed data that another package's concurrent
+		// test depends on.
+		sqlDB, err := db.DB()
+		if err != nil {
+			t.Fatalf("failed to get sql.DB for advisory lock: %v", err)
+		}
+		lockConn, err := sqlDB.Conn(context.Background())
+		if err != nil {
+			t.Fatalf("failed to open advisory lock connection: %v", err)
+		}
+		if _, err := lockConn.ExecContext(context.Background(), "SELECT pg_advisory_lock(1234567890)"); err != nil {
+			_ = lockConn.Close()
+			t.Fatalf("failed to acquire test exclusion lock: %v", err)
+		}
+
 		t.Cleanup(func() {
-			sqlDB, _ := db.DB()
-			if sqlDB != nil {
-				_ = sqlDB.Close()
+			_, _ = lockConn.ExecContext(context.Background(), "SELECT pg_advisory_unlock(1234567890)")
+			_ = lockConn.Close()
+			sqlDB2, _ := db.DB()
+			if sqlDB2 != nil {
+				_ = sqlDB2.Close()
 			}
 		})
 

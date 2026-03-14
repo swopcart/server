@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/swopcart/server/internal/database"
@@ -47,6 +48,11 @@ var ErrPasswordNotComplex = errors.New("password must contain a lowercase letter
 
 var ErrNotFound = errors.New("not found")
 var ErrInternal = errors.New("internal error")
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
 
 var ErrInvalidTOTP = errors.New("invalid TOTP token")
 
@@ -92,6 +98,9 @@ func (svc *IdentityService) CreateUser(
 
 	err = gorm.G[database.User](svc.db).Create(ctx, &user)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrUserAlreadyExists
+		}
 		return nil, err
 	}
 

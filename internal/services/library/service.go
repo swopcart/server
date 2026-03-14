@@ -12,6 +12,7 @@ import (
 	"github.com/swopcart/server/internal/config"
 	"github.com/swopcart/server/internal/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LibraryService struct {
@@ -88,7 +89,6 @@ func (svc *LibraryService) loadPlatforms(ctx context.Context) error {
 		}
 		extensionsStr := string(extensionsJSON)
 
-		// Upsert: create if not exists, update if exists
 		platform := &database.Platform{
 			Name:        entry.Name,
 			Description: entry.Description,
@@ -96,9 +96,11 @@ func (svc *LibraryService) loadPlatforms(ctx context.Context) error {
 		}
 
 		result := svc.db.WithContext(ctx).
-			Where("name = ?", entry.Name).
-			Assign(platform).
-			FirstOrCreate(platform)
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "name"}},
+				DoUpdates: clause.AssignmentColumns([]string{"description", "extensions"}),
+			}).
+			Create(platform)
 
 		if result.Error != nil {
 			return fmt.Errorf("failed to upsert platform %s: %w", entry.Name, result.Error)
@@ -149,9 +151,11 @@ func (svc *LibraryService) seedDefaultPlatforms(ctx context.Context) error {
 		}
 
 		result := svc.db.WithContext(ctx).
-			Where("name = ?", p.name).
-			Assign(platform).
-			FirstOrCreate(platform)
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "name"}},
+				DoUpdates: clause.AssignmentColumns([]string{"description", "extensions"}),
+			}).
+			Create(platform)
 
 		if result.Error != nil {
 			return fmt.Errorf("failed to seed platform %s: %w", p.name, result.Error)
